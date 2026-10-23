@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -330,7 +331,7 @@ private fun buildFeed(s: Schedule, subgroup: Int, today: LocalDate, withExams: B
 
 @Composable
 fun FeedScreen(s: Schedule, subgroup: Int, now: LocalDateTime, deadlines: List<Deadline>, onLesson: (Occurrence) -> Unit) {
-    ScheduleFeed(s, subgroup, now, deadlines, showGroups = false, withExams = true, title = { ScreenTitle("до конца семестра", "Пары") }, onLesson = onLesson)
+    ScheduleFeed(s, subgroup, now, deadlines, showGroups = false, withExams = true, onLesson = onLesson)
 }
 
 /** Бесконечная лента с переключателем недель 1–4; используется и для чужих расписаний. */
@@ -343,7 +344,7 @@ fun ScheduleFeed(
     deadlines: List<Deadline>,
     showGroups: Boolean,
     withExams: Boolean,
-    title: @Composable () -> Unit,
+    title: (@Composable () -> Unit)? = null,
     extraCard: (@Composable () -> Unit)? = null,
     onLesson: (Occurrence) -> Unit,
 ) {
@@ -353,7 +354,7 @@ fun ScheduleFeed(
     val scope = rememberCoroutineScope()
     // Сколько элементов идёт до ленты (заголовок, extra) — считаем по ключам.
     val headIndex = remember(feed) { feed.withIndex().filter { it.value is FeedItem.WeekHead }.map { it.index to (it.value as FeedItem.WeekHead) } }
-    val prefix = 1 + if (extraCard != null) 1 else 0
+    val prefix = (if (title != null) 1 else 0) + if (extraCard != null) 1 else 0
     val visibleWeek by remember(feed) {
         derivedStateOf {
             val i = state.firstVisibleItemIndex - prefix
@@ -374,7 +375,7 @@ fun ScheduleFeed(
                 contentPadding = PaddingValues(start = 20.dp, end = 20.dp, bottom = 88.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                item(key = "title") { Box(Modifier.padding(top = 8.dp)) { title() } }
+                if (title != null) item(key = "title") { Box(Modifier.padding(top = 8.dp)) { title() } }
                 if (extraCard != null) item(key = "extra") { extraCard() }
                 if (feed.none { it is FeedItem.Day }) item { EmptyCard("Пар не найдено", "Похоже, каникулы или расписание ещё не опубликовали.") }
                 feed.forEach { f ->
@@ -455,7 +456,7 @@ private fun CompactRow(o: Occurrence, showGroups: Boolean, faded: Boolean, onCli
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(Modifier.size(width = 46.dp, height = 36.dp), verticalArrangement = Arrangement.Center) {
+        Column(Modifier.width(46.dp), verticalArrangement = Arrangement.Center) {
             Text(l.start.format(TIME), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = if (faded) C.Muted else C.Ink)
             Text(l.end.format(TIME), fontSize = 12.sp, color = C.Muted)
         }

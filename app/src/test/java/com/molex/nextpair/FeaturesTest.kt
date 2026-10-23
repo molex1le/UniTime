@@ -2,6 +2,8 @@ package com.molex.nextpair
 
 import com.molex.nextpair.ui.commonWindows
 import com.molex.nextpair.ui.describeKey
+import com.molex.nextpair.ui.parseDate
+import com.molex.nextpair.ui.semesterOf
 import com.molex.nextpair.ui.roomPlace
 import com.molex.nextpair.ui.windowBefore
 import org.junit.Assert.assertEquals
@@ -73,5 +75,13 @@ class FeaturesTest {
         val b = Schedule.parse(changed, LocalDate.of(2026, 10, 19), 4).signatures()
         assertEquals(1, (b.keys - a.keys).size)
         assertEquals(1, (a.keys - b.keys).size)
+    }
+
+    @Test fun cabinetDatesAndSemesters() {
+        assertEquals(LocalDate.of(2025, 12, 26), parseDate("26.12.2025"))
+        assertEquals(LocalDate.of(2026, 1, 19), parseDate("2026-01-19T00:00:00.000+03:00"))
+        assertEquals("Осень 2025", semesterOf(LocalDate.of(2025, 12, 26)))
+        assertEquals("Осень 2025", semesterOf(LocalDate.of(2026, 1, 15))) // январская сессия — ещё осенний семестр
+        assertEquals("Весна 2026", semesterOf(LocalDate.of(2026, 4, 2)))
     }
 }

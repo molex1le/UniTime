@@ -58,7 +58,7 @@ fun AccountScreen(iis: Iis, onBack: () -> Unit) {
     val section = open
     when {
         !loggedIn -> LoginScreen(iis, onBack) { loggedIn = true }
-        section != null -> SectionScreen(iis, section.first, section.second, onBack = { open = null }) { loggedIn = false; open = null }
+        section != null -> SectionScreen(iis, section.first, section.second, section.third, onBack = { open = null }) { loggedIn = false; open = null }
         else -> CabinetHome(iis, onBack, onOpen = { open = it }) { iis.logout(); loggedIn = false }
     }
 }
@@ -186,7 +186,7 @@ private fun CabinetHome(iis: Iis, onBack: () -> Unit, onOpen: (Triple<String, St
 }
 
 @Composable
-private fun SectionScreen(iis: Iis, title: String, path: String, onBack: () -> Unit, onExpired: () -> Unit) {
+private fun SectionScreen(iis: Iis, title: String, path: String, kind: Iis.Section, onBack: () -> Unit, onExpired: () -> Unit) {
     val ctx = LocalContext.current
     var state by remember(path) { mutableStateOf<Iis.Response?>(null) }
     var failed by remember(path) { mutableStateOf(false) }
@@ -210,7 +210,13 @@ private fun SectionScreen(iis: Iis, title: String, path: String, onBack: () -> U
             else -> {
                 val parsed = runCatching { JSONTokener(r.body).nextValue() }.getOrNull()
                 if (parsed == null || isEmptyJson(parsed)) item { EmptyCard("Пусто", "В этом разделе пока ничего нет.") }
-                else item { JsonView(parsed, 0) }
+                else item {
+                    when {
+                        kind == Iis.Section.Profile && parsed is JSONObject -> ProfileView(parsed, iis)
+                        kind == Iis.Section.Markbook && parsed is JSONObject && parsed.has("markPages") -> MarkbookView(parsed)
+                        else -> BySemesterView(parsed) { v, d -> JsonView(v, d) }
+                    }
+                }
                 item {
                     Choice("Скопировать ответ", false) {
                         val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
@@ -241,35 +247,32 @@ private val LABELS = mapOf(
     "dormitoryPrivilegeCategoryName" to "Льгота", "year" to "Год", "omissionDtoList" to "Пропуски",
     "notifications" to "Уведомления", "message" to "Сообщение", "title" to "Заголовок", "text" to "Текст",
     "directiveDto" to "Приказ", "number" to "Номер", "lessonTypeAbbrev" to "Тип занятия",
-    "commonMark" to "Итог", "credit" to "Зачёт", "exam" to "Экзамен", "isViewed" to "Прочитано",
+    "commonMark" to "Средний по потоку", "credit" to "Зачёт", "exam" to "Экзамен", "isViewed" to "Прочитано",
+    "formOfControl" to "Форма контроля", "fullSubject" to "Предмет", "credits" to "Зачётные единицы",
+    "commonRetakes" to "Пересдают, %", "retakesCount" to "Твои пересдачи", "phone" to "Телефон",
+    "accountType" to "Тип аккаунта", "isGroupHead" to "Староста", "ldapBanDate" to "Учётка активна до",
+    "type" to "Тип", "name" to "Название", "description" to "Описание", "term" to "Семестр",
+    "orderNumber" to "Номер приказа", "orderDate" to "Дата приказа", "respectful" to "Уважительный",
+    "lessonType" to "Тип занятия", "cause" to "Причина", "comment" to "Комментарий", "createdDate" to "Создано",
 )
 
-private val SKIP = setOf("id", "photoUrl", "photo", "authorities", "fullShow", "calendarId", "urlId", "hasNext", "totalElements")
+private val SKIP = setOf("photoUrl", "photo", "authorities", "fullShow", "calendarId", "urlId", "hasNext", "totalElements",
+    "canStudentNote", "hasNotConfirmedContact", "hasProfiling")
+
+/** Служебные идентификаторы (id, idSubject, facultyId…) прячем. */
+private fun skip(key: String) = key in SKIP || key == "id" || key.endsWith("Id") || Regex("^id[A-Z]").containsMatchIn(key)
 
 private fun label(key: String) = LABELS[key] ?: key
 
 private fun primitive(v: Any?): String? = when (v) {
     null, JSONObject.NULL -> null
     is Boolean -> if (v) "да" else "нет"
-    is Number, is String -> v.toString().takeIf { it.isNotBlank() && it != "null" }?.let { prettyDate(it) }
+    is Number, is String -> v.toString().takeIf { it.isNotBlank() && it != "null" }?.let { prettyValue(it) }
     else -> null
 }
 
-/** Даты из API приходят как миллисекунды или ISO — показываем по-человечески. */
-private fun prettyDate(s: String): String {
-    s.toLongOrNull()?.takeIf { it > 1_000_000_000_000L }?.let {
-        val d = java.time.Instant.ofEpochMilli(it).atZone(java.time.ZoneId.systemDefault()).toLocalDate()
-        return "${d.dayOfMonth} ${month(d)} ${d.year}"
-    }
-    Regex("""^(\d{4})-(\d{2})-(\d{2})""").find(s)?.let {
-        val d = java.time.LocalDate.of(it.groupValues[1].toInt(), it.groupValues[2].toInt(), it.groupValues[3].toInt())
-        return "${d.dayOfMonth} ${month(d)} ${d.year}"
-    }
-    return s
-}
-
 @Composable
-private fun JsonView(v: Any, depth: Int) {
+fun JsonView(v: Any, depth: Int) {
     when (v) {
         is JSONArray -> Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
             for (i in 0 until v.length()) {
@@ -283,7 +286,7 @@ private fun JsonView(v: Any, depth: Int) {
             }
         }
         is JSONObject -> Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            val keys = v.keys().asSequence().filterNot { it in SKIP }.toList()
+            val keys = v.keys().asSequence().filterNot { skip(it) }.toList()
             for (k in keys) {
                 val child = v.get(k)
                 val p = primitive(child)
