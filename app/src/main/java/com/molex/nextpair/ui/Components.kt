@@ -54,6 +54,8 @@ data class Palette(
     val line: Color, val divider: Color, val segment: Color, val segOn: Color,
     val soft: Color, val softInk: Color, val hero: Color, val heroTrack: Color,
     val chevron: Color, val error: Color,
+    /** Свой акцент у секретной темы — вместо выбранного в настройках. */
+    val accent: Color? = null, val heroBar: Color? = null,
 )
 
 private val LIGHT = Palette(
@@ -67,6 +69,13 @@ private val DARK = Palette(
     Color(0xFF2A3140), Color(0xFF252C39), Color(0xFF1A202B), Color(0xFF323B4D),
     Color(0xFF26304A), Color(0xFFB9C4FF), Color(0xFF232C40), Color(0xFF39445C),
     Color(0xFF6B7484), Color(0xFFFF8FA3),
+)
+private val NEON = Palette(
+    true, Color(0xFF0B0614), Color(0xFF170D28), Color(0xFFF6EEFF), Color(0xFFB3A3D1),
+    Color(0xFF2E1C4A), Color(0xFF241640), Color(0xFF170D28), Color(0xFF3A2160),
+    Color(0xFF2A1450), Color(0xFF7DF9FF), Color(0xFF1F0E3A), Color(0xFF3B2266),
+    Color(0xFF7A6A99), Color(0xFFFF7A9C),
+    accent = Color(0xFFFF4FD8), heroBar = Color(0xFF00E5FF),
 )
 private val AMOLED = DARK.copy(ground = Color.Black, card = Color(0xFF12151C), segment = Color(0xFF12151C), hero = Color(0xFF1A2133))
 
@@ -90,6 +99,7 @@ object C {
             1 -> LIGHT
             2 -> DARK
             3 -> AMOLED
+            4 -> NEON
             else -> if (systemDark) DARK else LIGHT
         }
         accentIndex = accent.coerceIn(0, ACCENT.lastIndex)
@@ -112,8 +122,8 @@ object C {
     val HeroTrack get() = palette.heroTrack
     val Chevron get() = palette.chevron
     val Error get() = palette.error
-    val Accent get() = ACCENT[accentIndex].let { if (palette.dark) it.second else it.first }
-    val HeroBar get() = ACCENT[accentIndex].second
+    val Accent get() = palette.accent ?: ACCENT[accentIndex].let { if (palette.dark) it.second else it.first }
+    val HeroBar get() = palette.heroBar ?: ACCENT[accentIndex].second
     val HeroMuted = Color(0xFFC9CED8)
     val HeroLabel = Color(0xFFB9C4FF)
     val Live = Color(0xFF7CF0B0)

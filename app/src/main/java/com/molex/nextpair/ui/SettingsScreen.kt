@@ -53,7 +53,10 @@ fun SettingsScreen(
     onRefresh: () -> Unit,
     onCalendar: (add: Boolean) -> Unit,
     onAccount: () -> Unit,
+    onSecretStats: () -> Unit,
 ) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    var secretTaps by remember { mutableIntStateOf(0) }
     fun changed(look: Boolean = false, notif: Boolean = false) {
         if (look) onLookChanged()
         if (notif) onNotifChanged()
@@ -100,7 +103,8 @@ fun SettingsScreen(
         item {
             Card {
                 Text("Тема", fontSize = 13.sp, color = C.Muted)
-                Segmented(listOf("Авто", "Светлая", "Тёмная", "Чёрная"), st.theme) { st.theme = it; changed(look = true) }
+                val themes = listOf("Авто", "Светлая", "Тёмная", "Чёрная") + if (st.neonUnlocked) listOf("Неон") else emptyList()
+                Segmented(themes, st.theme.coerceAtMost(themes.lastIndex)) { st.theme = it; changed(look = true) }
                 Text("Акцент", fontSize = 13.sp, color = C.Muted)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Settings.ACCENTS.forEachIndexed { i, name -> Choice(name, st.accent == i) { st.accent = i; changed(look = true) } }
@@ -203,9 +207,20 @@ fun SettingsScreen(
         }
 
         item {
+            // Пасхалка: 7 тапов по подписи открывают секретную статистику.
             Text(
                 "UniTime · данные с iis.bsuir.by\nmade by molex1le",
-                fontSize = 12.sp, color = C.Muted, lineHeight = 17.sp, modifier = Modifier.padding(top = 8.dp),
+                fontSize = 12.sp, color = C.Muted, lineHeight = 17.sp,
+                modifier = Modifier.padding(top = 8.dp).clip(RoundedCornerShape(8.dp)).clickable(
+                    interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
+                    indication = null,
+                ) {
+                    secretTaps++
+                    when {
+                        secretTaps >= 7 -> { secretTaps = 0; onSecretStats() }
+                        secretTaps >= 3 -> android.widget.Toast.makeText(ctx, "Ещё ${7 - secretTaps}…", android.widget.Toast.LENGTH_SHORT).show()
+                    }
+                }.padding(vertical = 4.dp),
             )
         }
     }

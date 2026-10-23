@@ -96,4 +96,14 @@ class FeaturesTest {
         assertEquals("", pp.str("reason"))
         assertEquals("123", pp.str("directiveDto"))
     }
+
+    @Test fun semesterStats() {
+        val st = Stats.semester(fresh(), 1, LocalDateTime.of(2026, 10, 30, 10, 52))
+        assertTrue(st.pairs > 50)
+        assertTrue(st.hoursDone in 1.0..st.hours)
+        assertNotNull(st.topTeacher)
+        assertNotNull(st.topRoom)
+        println("STATS: ${st.pairs} пар, ${st.hours} ч, позади ${st.hoursDone} ч; препод ${st.topTeacher?.first?.short} ×${st.topTeacher?.second}; " +
+            "аудитория ${st.topRoom}; тяжёлый день ${st.hardestDay}; 8:30 — ${st.earlyPairs}; самый длинный ${st.longestDay}; окна ${st.windowHours} ч; без пар ${st.freeDays}")
+    }
 }

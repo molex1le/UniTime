@@ -330,8 +330,8 @@ private fun buildFeed(s: Schedule, subgroup: Int, today: LocalDate, withExams: B
 }
 
 @Composable
-fun FeedScreen(s: Schedule, subgroup: Int, now: LocalDateTime, deadlines: List<Deadline>, onLesson: (Occurrence) -> Unit) {
-    ScheduleFeed(s, subgroup, now, deadlines, showGroups = false, withExams = true, onLesson = onLesson)
+fun FeedScreen(s: Schedule, subgroup: Int, now: LocalDateTime, deadlines: List<Deadline>, onSecret: () -> Unit, onLesson: (Occurrence) -> Unit) {
+    ScheduleFeed(s, subgroup, now, deadlines, showGroups = false, withExams = true, onSecret = onSecret, onLesson = onLesson)
 }
 
 /** Бесконечная лента с переключателем недель 1–4; используется и для чужих расписаний. */
@@ -346,6 +346,7 @@ fun ScheduleFeed(
     withExams: Boolean,
     title: (@Composable () -> Unit)? = null,
     extraCard: (@Composable () -> Unit)? = null,
+    onSecret: (() -> Unit)? = null,
     onLesson: (Occurrence) -> Unit,
 ) {
     val today = now.toLocalDate()
@@ -363,6 +364,8 @@ fun ScheduleFeed(
     }
     // Нажатая неделя подсвечивается сразу, не дожидаясь прокрутки.
     var picked by remember { mutableStateOf<Int?>(null) }
+    // Пасхалка: недели 1-2-3-4-4-3-2-1 подряд, не дольше 8 секунд.
+    val taps = remember { ArrayDeque<Pair<Int, Long>>() }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
@@ -370,6 +373,15 @@ fun ScheduleFeed(
                 Segmented((1..4).map { "$it нед." }, (picked ?: visibleWeek) - 1) { pick ->
                     val target = headIndex.firstOrNull { it.second.n == pick + 1 }
                     picked = pick + 1
+                    if (onSecret != null) {
+                        val t = System.currentTimeMillis()
+                        taps.addLast(pick + 1 to t)
+                        while (taps.size > SECRET.size) taps.removeFirst()
+                        if (taps.map { it.first } == SECRET && t - taps.first().second < 8000) {
+                            taps.clear()
+                            onSecret()
+                        }
+                    }
                     if (target != null) scope.launch {
                         state.scrollToItem(target.first + prefix)
                         picked = null
@@ -480,6 +492,8 @@ private fun CompactRow(o: Occurrence, showGroups: Boolean, faded: Boolean, onCli
         TypeChip(l.type)
     }
 }
+
+private val SECRET = listOf(1, 2, 3, 4, 4, 3, 2, 1)
 
 // ---------- Сессия ----------
 

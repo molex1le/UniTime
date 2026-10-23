@@ -67,6 +67,7 @@ sealed interface Overlay {
     data object Friends : Overlay
     data object Account : Overlay
     data object Exams : Overlay
+    data object Stats : Overlay
 }
 
 class MainActivity : ComponentActivity() {
@@ -112,6 +113,16 @@ class MainActivity : ComponentActivity() {
         C.apply(st.theme, systemDark, st.accent, st.shortNames, st.pairNumbers)
         val bar = { c: Int -> if (C.Dark) SystemBarStyle.dark(c) else SystemBarStyle.light(c, c) }
         enableEdgeToEdge(statusBarStyle = bar(C.Ground.toArgb()), navigationBarStyle = bar(C.Card.toArgb()))
+    }
+
+    private fun unlockNeon() {
+        if (st.neonUnlocked && st.theme == 4) return toast("Ты уже в неоне ✨")
+        val first = !st.neonUnlocked
+        st.neonUnlocked = true
+        st.theme = 4
+        applyLook()
+        reloadLocal()
+        toast(if (first) "Секретная тема «Неон» открыта! Вернуть обычную — в настройках" else "Снова неон ✨")
     }
 
     private fun toast(text: String) = runOnUiThread { Toast.makeText(this, text, Toast.LENGTH_LONG).show() }
@@ -195,7 +206,11 @@ class MainActivity : ComponentActivity() {
                     onRefresh = { load(force = true) },
                     onCalendar = { calendar(it) },
                     onAccount = { stack.add(Overlay.Account) },
+                    onSecretStats = {
+                        if (schedule != null) stack.add(Overlay.Stats) else toast("Сначала загрузите расписание")
+                    },
                 )
+                Overlay.Stats -> schedule?.let { s -> com.molex.nextpair.ui.SecretStatsScreen(s, repo.subgroup, now, onBack = back) } ?: LaunchedEffect(Unit) { back() }
                 Overlay.Account -> com.molex.nextpair.ui.AccountScreen(iis, onBack = back)
                 Overlay.Exams -> schedule?.let { s -> ExamsScreen(s, now, onBack = back) { openLesson(it, true) } } ?: LaunchedEffect(Unit) { back() }
                 Overlay.Friends -> {
@@ -225,7 +240,7 @@ class MainActivity : ComponentActivity() {
                                 onExams = { stack.add(Overlay.Exams) },
                                 onDeadlines = { tab = Tab.Deadlines },
                             ) { openLesson(it, true) }
-                            tab == Tab.Feed -> FeedScreen(s, repo.subgroup, now, deadlines) { openLesson(it, true) }
+                            tab == Tab.Feed -> FeedScreen(s, repo.subgroup, now, deadlines, onSecret = { unlockNeon() }) { openLesson(it, true) }
                         }
                     }
                     BottomNav(tab) { tab = it }

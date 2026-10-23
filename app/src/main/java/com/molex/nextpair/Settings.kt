@@ -20,7 +20,10 @@ class Settings(ctx: Context) {
         version.intValue++
     }
 
-    /** 0 — как в системе, 1 — светлая, 2 — тёмная, 3 — чёрная (AMOLED). */
+    /** Секретная тема открыта комбинацией недель. */
+    var neonUnlocked: Boolean get() = bool("neonUnlocked", false); set(v) = put("neonUnlocked", v)
+
+    /** 0 — как в системе, 1 — светлая, 2 — тёмная, 3 — чёрная (AMOLED), 4 — «Неон» (секретная). */
     var theme: Int get() = int("theme", 0); set(v) = put("theme", v)
     /** Индекс в [ACCENTS]. */
     var accent: Int get() = int("accent", 0); set(v) = put("accent", v)
