@@ -102,19 +102,27 @@ class Iis(ctx: Context) {
         }
     }
 
+    /** Раздел кабинета как в меню сайта; некоторые собираются из нескольких запросов. */
+    data class Section(val title: String, val kind: Kind, val paths: List<String>)
+
+    enum class Kind { Profile, Markbook, Performance, Omissions, Dean, Dormitory, Group, Library, Settings, Notifications }
+
     companion object {
-        /** Разделы кабинета: название → путь API. Формат ответов разбираем по мере проверки на живом аккаунте. */
         val SECTIONS = listOf(
-            Triple("Профиль", "/auth/user", Section.Profile),
-            Triple("Зачётка", "/markbook", Section.Markbook),
-            Triple("Пропуски", "/omissions-by-student", Section.Omissions),
-            Triple("Неуважительные пропуски", "/disrespectful-omissions-by-student", Section.Omissions),
-            Triple("Поощрения и взыскания", "/dormitory-queue-application/premium-penalty", Section.Other),
-            Triple("Льготы", "/dormitory-queue-application/privileges", Section.Other),
-            Triple("Рейтинг", "/personal-rating", Section.Other),
-            Triple("Уведомления", "/notifications?pageNumber=1&pageSize=30", Section.Other),
+            Section("Профиль", Kind.Profile, listOf("/auth/user")),
+            Section("Зачётка", Kind.Markbook, listOf("/markbook")),
+            Section("Успеваемость", Kind.Performance, listOf("/personal-rating")),
+            Section("Пропуски", Kind.Omissions, listOf("/omissions-by-student", "/disrespectful-omissions-by-student")),
+            Section("Деканат", Kind.Dean, listOf("/certificate")),
+            Section("Общежитие", Kind.Dormitory, listOf(
+                "/dormitory-queue-application",
+                "/dormitory-queue-application/privileges",
+                "/dormitory-queue-application/premium-penalty",
+            )),
+            Section("Группа", Kind.Group, listOf("/student-groups/user-group-info")),
+            Section("Библиотека", Kind.Library, listOf("/library/books")),
+            Section("Уведомления", Kind.Notifications, listOf("/notifications?pageNumber=1&pageSize=30")),
+            Section("Настройки", Kind.Settings, listOf("/settings/last-password-change", "/settings/password-attempts", "/settings/contacts")),
         )
     }
-
-    enum class Section { Profile, Markbook, Omissions, Other }
 }

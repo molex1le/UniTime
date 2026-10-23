@@ -45,6 +45,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.molex.nextpair.Iis
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -54,11 +55,11 @@ import org.json.JSONTokener
 @Composable
 fun AccountScreen(iis: Iis, onBack: () -> Unit) {
     var loggedIn by remember { mutableStateOf(iis.loggedIn) }
-    var open by remember { mutableStateOf<Triple<String, String, Iis.Section>?>(null) }
+    var open by remember { mutableStateOf<Iis.Section?>(null) }
     val section = open
     when {
         !loggedIn -> LoginScreen(iis, onBack) { loggedIn = true }
-        section != null -> SectionScreen(iis, section.first, section.second, section.third, onBack = { open = null }) { loggedIn = false; open = null }
+        section != null -> SectionScreen(iis, section, onBack = { open = null }) { loggedIn = false; open = null }
         else -> CabinetHome(iis, onBack, onOpen = { open = it }) { iis.logout(); loggedIn = false }
     }
 }
@@ -156,7 +157,7 @@ private fun PasswordField(value: String, onChange: (String) -> Unit) {
 }
 
 @Composable
-private fun CabinetHome(iis: Iis, onBack: () -> Unit, onOpen: (Triple<String, String, Iis.Section>) -> Unit, onLogout: () -> Unit) {
+private fun CabinetHome(iis: Iis, onBack: () -> Unit, onOpen: (Iis.Section) -> Unit, onLogout: () -> Unit) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item { RoundButton(Glyph.Back, "Назад", onBack) }
         item { ScreenTitle("вход: ${iis.login}", "Личный кабинет") }
@@ -167,66 +168,98 @@ private fun CabinetHome(iis: Iis, onBack: () -> Unit, onOpen: (Triple<String, St
                     Row(
                         Modifier.fillMaxWidth().clickable { onOpen(s) }.heightIn(min = 52.dp).padding(horizontal = 16.dp, vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(14.dp),
                     ) {
-                        Text(s.first, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = C.Ink, modifier = Modifier.weight(1f))
+                        Glyph(glyphFor(s.kind), C.Accent, 22.dp)
+                        Text(s.title, fontSize = 15.sp, fontWeight = FontWeight.Medium, color = C.Ink, modifier = Modifier.weight(1f))
                         Glyph(Glyph.Chevron, C.Chevron, 18.dp)
                     }
                 }
             }
         }
-        item {
-            Text(
-                "Это первая версия: данные показаны как приходят с сервера. " +
-                    "Нажми «Скопировать ответ» в разделе, если захочешь, чтобы я сделал для него красивый экран.",
-                fontSize = 12.sp, color = C.Muted, lineHeight = 17.sp,
-            )
-        }
         item { Choice("Выйти из аккаунта", false, onLogout) }
     }
 }
 
+private fun glyphFor(k: Iis.Kind) = when (k) {
+    Iis.Kind.Profile -> Glyph.User
+    Iis.Kind.Markbook -> Glyph.Doc
+    Iis.Kind.Performance -> Glyph.Star
+    Iis.Kind.Omissions -> Glyph.Clock
+    Iis.Kind.Dean -> Glyph.Cap
+    Iis.Kind.Dormitory -> Glyph.Pin
+    Iis.Kind.Group -> Glyph.People
+    Iis.Kind.Library -> Glyph.Calendar
+    Iis.Kind.Notifications -> Glyph.Bell
+    Iis.Kind.Settings -> Glyph.Gear
+}
+
 @Composable
-private fun SectionScreen(iis: Iis, title: String, path: String, kind: Iis.Section, onBack: () -> Unit, onExpired: () -> Unit) {
+private fun SectionScreen(iis: Iis, section: Iis.Section, onBack: () -> Unit, onExpired: () -> Unit) {
     val ctx = LocalContext.current
-    var state by remember(path) { mutableStateOf<Iis.Response?>(null) }
-    var failed by remember(path) { mutableStateOf(false) }
-    LaunchedEffect(path) {
-        runCatching { state = withContext(Dispatchers.IO) { iis.get(path) } }.onFailure { failed = true }
+    var results by remember(section) { mutableStateOf<List<Iis.Response?>?>(null) }
+    var failed by remember(section) { mutableStateOf(false) }
+    LaunchedEffect(section) {
+        runCatching {
+            results = withContext(Dispatchers.IO) {
+                kotlinx.coroutines.coroutineScope {
+                    section.paths.map { p -> async { runCatching { iis.get(p) }.getOrNull() } }.map { it.await() }
+                }
+            }
+        }.onFailure { failed = true }
     }
-    val r = state
+    val rs = results
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { RoundButton(Glyph.Back, "Назад", onBack) }
-        item { ScreenTitle(null, title) }
+        item { ScreenTitle(null, section.title) }
         when {
-            failed -> item { Text("Нет связи с iis.bsuir.by", color = C.Error, fontSize = 14.sp) }
-            r == null -> item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = C.Accent) } }
-            r.code == 401 || r.code == 403 -> item {
+            failed || (rs != null && rs.all { it == null }) -> item { Text("Нет связи с iis.bsuir.by", color = C.Error, fontSize = 14.sp) }
+            rs == null -> item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = C.Accent) } }
+            rs.any { it?.code == 401 } || rs.all { it?.code == 403 } -> item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Сессия закончилась — нужно войти заново.", color = C.Ink, fontSize = 15.sp)
                     Choice("Войти", true, onExpired)
                 }
             }
-            r.code !in 200..299 -> item { Text("Сервер ответил ${r.code}. Возможно, этот раздел недоступен для твоего аккаунта.", color = C.Muted, fontSize = 14.sp) }
             else -> {
-                val parsed = runCatching { JSONTokener(r.body).nextValue() }.getOrNull()
-                if (parsed == null || isEmptyJson(parsed)) item { EmptyCard("Пусто", "В этом разделе пока ничего нет.") }
-                else item {
-                    when {
-                        kind == Iis.Section.Profile && parsed is JSONObject -> ProfileView(parsed, iis)
-                        kind == Iis.Section.Markbook && parsed is JSONObject && parsed.has("markPages") -> MarkbookView(parsed)
-                        else -> BySemesterView(parsed) { v, d -> JsonView(v, d) }
+                // Неуспешный ответ одного из запросов просто даёт пустой кусок раздела.
+                val parsed = rs.map { r -> r?.takeIf { it.code in 200..299 }?.let { runCatching { JSONTokener(it.body).nextValue() }.getOrNull() } }
+                val first = parsed.firstOrNull()
+                item {
+                    when (section.kind) {
+                        Iis.Kind.Profile -> if (first is JSONObject) ProfileView(first, iis) else Unavailable(rs)
+                        Iis.Kind.Markbook -> if (first is JSONObject && first.has("markPages")) MarkbookView(first) else Unavailable(rs)
+                        Iis.Kind.Performance -> if (first != null) PerformanceView(first) else Unavailable(rs)
+                        Iis.Kind.Omissions -> OmissionsView(parsed.getOrNull(0), parsed.getOrNull(1))
+                        Iis.Kind.Dean -> DeanView(first)
+                        Iis.Kind.Dormitory -> DormitoryView(parsed.getOrNull(0), parsed.getOrNull(1), parsed.getOrNull(2))
+                        Iis.Kind.Group -> if (first != null) GroupView(first) else Unavailable(rs)
+                        Iis.Kind.Library -> LibraryView(first)
+                        Iis.Kind.Notifications -> NotificationsView(first)
+                        Iis.Kind.Settings -> AccountSettingsView(parsed.getOrNull(0), parsed.getOrNull(1), parsed.getOrNull(2))
                     }
                 }
                 item {
-                    Choice("Скопировать ответ", false) {
-                        val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
-                        cm.setPrimaryClip(ClipData.newPlainText(title, r.body))
-                        Toast.makeText(ctx, "Скопировано", Toast.LENGTH_SHORT).show()
-                    }
+                    Text(
+                        "Скопировать данные для отладки",
+                        fontSize = 12.sp, color = C.Muted,
+                        modifier = Modifier.clip(RoundedCornerShape(8.dp)).clickable {
+                            val text = section.paths.zip(rs).joinToString("\n\n") { (p, r) -> "$p → ${r?.code}\n${r?.body}" }
+                            val cm = ctx.getSystemService(Context.CLIPBOARD_SERVICE) as ClipboardManager
+                            cm.setPrimaryClip(ClipData.newPlainText(section.title, text))
+                            Toast.makeText(ctx, "Скопировано", Toast.LENGTH_SHORT).show()
+                        }.padding(vertical = 8.dp),
+                    )
                 }
             }
         }
     }
+}
+
+@Composable
+private fun Unavailable(rs: List<Iis.Response?>) {
+    val code = rs.firstOrNull()?.code
+    EmptyCard("Раздел недоступен", if (code != null) "Сервер ответил $code — возможно, у твоего аккаунта нет этого раздела." else "Нет связи с iis.bsuir.by.")
 }
 
 private fun isEmptyJson(v: Any): Boolean = when (v) {

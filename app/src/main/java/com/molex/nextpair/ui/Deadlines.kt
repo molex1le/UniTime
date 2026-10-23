@@ -150,6 +150,7 @@ fun DeadlineEditor(
     var subject by remember { mutableStateOf(draft.subject) }
     var due by remember { mutableStateOf(draft.due) }
     var pickDate by remember { mutableStateOf(false) }
+    var titleError by remember { mutableStateOf(false) }
     val subjects = schedule?.subjects().orEmpty()
     val nextPair = if (subject.isNotBlank()) schedule?.nextOf(subject, now, subgroup) else null
 
@@ -159,7 +160,8 @@ fun DeadlineEditor(
         title = { Text(if (existing) "Дедлайн" else "Новый дедлайн", fontWeight = FontWeight.Bold, color = C.Ink) },
         text = {
             Column(Modifier.verticalScroll(rememberScrollState()), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                Field(title, { title = it }, "Что сдать? Например: лаба №3")
+                Field(title, { title = it; titleError = false }, "Что сдать? Например: лаба №3")
+                if (titleError) Text("Введи название дедлайна — без него не сохранить", fontSize = 13.sp, color = C.Error, fontWeight = FontWeight.SemiBold)
                 Text("Предмет", fontSize = 13.sp, color = C.Muted)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Choice("Без предмета", subject.isBlank()) { subject = "" }
@@ -191,10 +193,10 @@ fun DeadlineEditor(
             }
         },
         confirmButton = {
-            TextButton(
-                { onSave(draft.copy(title = title.trim(), subject = subject, due = due)) },
-                enabled = title.isNotBlank(),
-            ) { Text("Сохранить", color = if (title.isNotBlank()) C.Accent else C.Muted, fontWeight = FontWeight.SemiBold) }
+            TextButton({
+                if (title.isBlank()) titleError = true
+                else onSave(draft.copy(title = title.trim(), subject = subject, due = due))
+            }) { Text("Сохранить", color = C.Accent, fontWeight = FontWeight.SemiBold) }
         },
         dismissButton = { TextButton(onDismiss) { Text("Отмена", color = C.Muted) } },
     )

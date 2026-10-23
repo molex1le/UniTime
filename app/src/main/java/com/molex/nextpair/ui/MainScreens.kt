@@ -361,13 +361,19 @@ fun ScheduleFeed(
             headIndex.lastOrNull { it.first <= i }?.second?.n ?: s.weekNumber(today)
         }
     }
+    // Нажатая неделя подсвечивается сразу, не дожидаясь прокрутки.
+    var picked by remember { mutableStateOf<Int?>(null) }
 
     Box(Modifier.fillMaxSize()) {
         Column(Modifier.fillMaxSize()) {
             Column(Modifier.padding(start = 20.dp, end = 20.dp, top = 20.dp, bottom = 8.dp)) {
-                Segmented((1..4).map { "$it нед." }, visibleWeek - 1) { pick ->
+                Segmented((1..4).map { "$it нед." }, (picked ?: visibleWeek) - 1) { pick ->
                     val target = headIndex.firstOrNull { it.second.n == pick + 1 }
-                    if (target != null) scope.launch { state.animateScrollToItem(target.first + prefix) }
+                    picked = pick + 1
+                    if (target != null) scope.launch {
+                        state.scrollToItem(target.first + prefix)
+                        picked = null
+                    } else picked = null
                 }
             }
             LazyColumn(

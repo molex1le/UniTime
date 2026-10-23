@@ -200,7 +200,7 @@ fun SettingsScreen(
 
         item {
             Text(
-                "Следующая пара · данные с iis.bsuir.by\nНеофициальное приложение, не связано с БГУИР.",
+                "Следующая пара · данные с iis.bsuir.by\nmade by molex1le",
                 fontSize = 12.sp, color = C.Muted, lineHeight = 17.sp, modifier = Modifier.padding(top = 8.dp),
             )
         }

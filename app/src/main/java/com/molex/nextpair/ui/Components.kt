@@ -10,6 +10,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -240,8 +241,31 @@ fun TeacherPhoto(t: Teacher, size: Dp) {
     }
     val shape = RoundedCornerShape(size * 0.32f)
     val i = img
+    var full by remember { mutableStateOf(false) }
     if (i != null) {
-        Image(i, "Фото: ${t.full}", Modifier.size(size).clip(shape), contentScale = ContentScale.Crop)
+        Image(
+            i, "Фото: ${t.full}",
+            Modifier.size(size).clip(shape).clickable(onClickLabel = "Открыть фото") { full = true },
+            contentScale = ContentScale.Crop,
+        )
+        if (full) {
+            // Фото на весь экран; закрывается тапом или кнопкой «назад».
+            androidx.compose.ui.window.Dialog(
+                onDismissRequest = { full = false },
+                properties = androidx.compose.ui.window.DialogProperties(usePlatformDefaultWidth = false),
+            ) {
+                Box(
+                    Modifier.fillMaxSize().background(Color.Black).clickable { full = false },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Image(i, "Фото: ${t.full}", Modifier.fillMaxWidth(), contentScale = ContentScale.FillWidth)
+                    Text(
+                        t.full, color = Color.White, fontSize = 17.sp, fontWeight = FontWeight.SemiBold,
+                        modifier = Modifier.align(Alignment.BottomCenter).padding(32.dp),
+                    )
+                }
+            }
+        }
     } else {
         Box(Modifier.size(size).clip(shape).background(C.Soft), contentAlignment = Alignment.Center) {
             Text(t.initials, color = C.SoftInk, fontSize = (size.value * 0.34f).sp, fontWeight = FontWeight.Bold)

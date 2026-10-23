@@ -2,6 +2,8 @@ package com.molex.nextpair
 
 import com.molex.nextpair.ui.commonWindows
 import com.molex.nextpair.ui.describeKey
+import com.molex.nextpair.ui.listIn
+import com.molex.nextpair.ui.str
 import com.molex.nextpair.ui.parseDate
 import com.molex.nextpair.ui.semesterOf
 import com.molex.nextpair.ui.roomPlace
@@ -83,5 +85,15 @@ class FeaturesTest {
         assertEquals("Осень 2025", semesterOf(LocalDate.of(2025, 12, 26)))
         assertEquals("Осень 2025", semesterOf(LocalDate.of(2026, 1, 15))) // январская сессия — ещё осенний семестр
         assertEquals("Весна 2026", semesterOf(LocalDate.of(2026, 4, 2)))
+    }
+
+    @Test fun cabinetListsAndFields() {
+        val resp = org.json.JSONObject("""{"faculty":"ИЭФ","omissionDtoList":[{"subject":"КС","hours":2.0},{"subject":"БД","hours":"4"}]}""")
+        val list = listIn(resp, "omissionDtoList")
+        assertEquals(2, list.size)
+        assertEquals(6.0, list.sumOf { it.optString("hours").toDouble() }, 0.001)
+        val pp = org.json.JSONObject("""{"eventTypeName":"Взыскание","directiveDto":{"number":"123"},"reason":null}""")
+        assertEquals("", pp.str("reason"))
+        assertEquals("123", pp.str("directiveDto"))
     }
 }
