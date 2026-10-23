@@ -11,7 +11,8 @@
 
     <application
         android:label="@string/app_name"
-        android:icon="@drawable/ic_launcher"
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round"
         android:theme="@android:style/Theme.Material.Light.NoActionBar">
 
         <activity android:name=".MainActivity" android:exported="true" android:windowSoftInputMode="adjustResize">
@@ -31,12 +32,38 @@
         </receiver>
 
         <receiver android:name=".ReminderReceiver" android:exported="false" />
+        <receiver android:name=".IisWatchReceiver" android:exported="false" />
 
         <receiver android:name=".PairWidget" android:exported="false">
             <intent-filter>
                 <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
             </intent-filter>
             <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_info" />
+        </receiver>
+
+        <receiver android:name=".widgets.SmallWidget" android:exported="false" android:label="@string/w_small">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_small_info" />
+        </receiver>
+        <receiver android:name=".widgets.DayWidget" android:exported="false" android:label="@string/w_day">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_day_info" />
+        </receiver>
+        <receiver android:name=".widgets.DeadlinesWidget" android:exported="false" android:label="@string/w_deadlines">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_deadlines_info" />
+        </receiver>
+        <receiver android:name=".widgets.ExamsWidget" android:exported="false" android:label="@string/w_exams">
+            <intent-filter>
+                <action android:name="android.appwidget.action.APPWIDGET_UPDATE" />
+            </intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/widget_exams_info" />
         </receiver>
     </application>
 </manifest>

@@ -1,6 +1,14 @@
 package com.molex.nextpair
 
 import android.content.Context
+import android.security.keystore.KeyGenParameterSpec
+import android.security.keystore.KeyProperties
+import android.util.Base64
+import java.security.KeyStore
+import javax.crypto.Cipher
+import javax.crypto.KeyGenerator
+import javax.crypto.SecretKey
+import javax.crypto.spec.GCMParameterSpec
 import org.json.JSONObject
 import java.net.HttpCookie
 import java.net.HttpURLConnection
@@ -8,8 +16,8 @@ import java.net.URL
 
 /**
  * Личный кабинет iis.bsuir.by. Тот же API, что у сайта: вход по студбилету и паролю,
- * дальше сессия в cookie. Пароль нигде не сохраняется — только cookie сессии
- * (в приватном хранилище приложения), и уходит он только на iis.bsuir.by.
+ * дальше сессия в cookie. Пароль уходит только на iis.bsuir.by; сохраняется он,
+ * только если включено «Запомнить пароль», и тогда — зашифрованным ключом из Android Keystore.
  */
 class Iis(ctx: Context) {
     private val prefs = ctx.getSharedPreferences("iis", Context.MODE_PRIVATE)
@@ -23,16 +31,18 @@ class Iis(ctx: Context) {
 
     data class Response(val code: Int, val body: String)
 
-    val loggedIn: Boolean get() = cookies().isNotEmpty() && prefs.getBoolean("ok", false)
+    val loggedIn: Boolean get() = (cookies().isNotEmpty() && prefs.getBoolean("ok", false)) || hasSavedPassword
     val login: String get() = prefs.getString("login", "")!!
+    val hasSavedPassword: Boolean get() = prefs.contains("pw")
 
-    fun login(username: String, password: String, remember: Boolean): LoginResult {
-        prefs.edit().clear().apply()
+    fun login(username: String, password: String, remember: Boolean, savePassword: Boolean = false): LoginResult {
+        prefs.edit().remove("cookies").remove("ok").remove("pw").apply()
         val body = JSONObject().put("username", username).put("password", password).put("rememberDevice", remember)
         val r = request("POST", "/auth/login", body.toString())
         return when (r.code) {
             200, 201, 204 -> {
                 prefs.edit().putBoolean("ok", true).putString("login", username).apply()
+                if (savePassword) runCatching { prefs.edit().putString("pw", encrypt(password)).apply() }
                 LoginResult.Ok
             }
             280 -> LoginResult.Redirect(runCatching { JSONObject(r.body).optString("redirectUrl") }.getOrDefault(""))
@@ -55,11 +65,47 @@ class Iis(ctx: Context) {
         prefs.edit().clear().apply()
     }
 
-    /** GET к API кабинета. 401/403 означает, что сессия кончилась — сбрасываем вход. */
+    fun forgetPassword() = prefs.edit().remove("pw").apply()
+
+    /**
+     * GET к API кабинета. 401/403 — сессия кончилась: если пароль сохранён, входим заново
+     * и повторяем запрос, иначе сбрасываем вход.
+     */
     fun get(path: String): Response {
         val r = request("GET", path)
-        if (r.code == 401 || r.code == 403) prefs.edit().putBoolean("ok", false).apply()
-        return r
+        if (r.code != 401 && r.code != 403) return r
+        prefs.edit().putBoolean("ok", false).apply()
+        val pw = prefs.getString("pw", null)?.let { runCatching { decrypt(it) }.getOrNull() } ?: return r
+        val again = login(login, pw, remember = true, savePassword = true)
+        return if (again is LoginResult.Ok) request("GET", path) else r
+    }
+
+    // --- Шифрование пароля ключом, который не покидает защищённое хранилище телефона ---
+
+    private fun key(): SecretKey {
+        val ks = KeyStore.getInstance("AndroidKeyStore").apply { load(null) }
+        (ks.getEntry(KEY_ALIAS, null) as? KeyStore.SecretKeyEntry)?.let { return it.secretKey }
+        val gen = KeyGenerator.getInstance(KeyProperties.KEY_ALGORITHM_AES, "AndroidKeyStore")
+        gen.init(
+            KeyGenParameterSpec.Builder(KEY_ALIAS, KeyProperties.PURPOSE_ENCRYPT or KeyProperties.PURPOSE_DECRYPT)
+                .setBlockModes(KeyProperties.BLOCK_MODE_GCM)
+                .setEncryptionPaddings(KeyProperties.ENCRYPTION_PADDING_NONE)
+                .build(),
+        )
+        return gen.generateKey()
+    }
+
+    private fun encrypt(plain: String): String {
+        val c = Cipher.getInstance("AES/GCM/NoPadding").apply { init(Cipher.ENCRYPT_MODE, key()) }
+        val data = c.iv + c.doFinal(plain.toByteArray())
+        return Base64.encodeToString(data, Base64.NO_WRAP)
+    }
+
+    private fun decrypt(stored: String): String {
+        val data = Base64.decode(stored, Base64.NO_WRAP)
+        val c = Cipher.getInstance("AES/GCM/NoPadding")
+        c.init(Cipher.DECRYPT_MODE, key(), GCMParameterSpec(128, data, 0, 12))
+        return String(c.doFinal(data, 12, data.size - 12))
     }
 
     private fun cookies(): Map<String, String> =
@@ -108,6 +154,8 @@ class Iis(ctx: Context) {
     enum class Kind { Profile, Markbook, Performance, Omissions, Dean, Dormitory, Group, Library, Settings, Notifications }
 
     companion object {
+        private const val KEY_ALIAS = "nextpair_iis"
+
         val SECTIONS = listOf(
             Section("Профиль", Kind.Profile, listOf("/auth/user")),
             Section("Зачётка", Kind.Markbook, listOf("/markbook")),

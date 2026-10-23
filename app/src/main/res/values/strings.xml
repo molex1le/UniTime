@@ -1,3 +1,7 @@
 <resources>
-    <string name="app_name">Следующая пара</string>
+    <string name="app_name">UniTime</string>
+    <string name="w_small">Следующая пара · мини</string>
+    <string name="w_day">Пары на день</string>
+    <string name="w_deadlines">Дедлайны</string>
+    <string name="w_exams">До сессии</string>
 </resources>

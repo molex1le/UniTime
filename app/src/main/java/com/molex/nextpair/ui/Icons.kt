@@ -122,7 +122,7 @@ fun Icon(tab: Tab, color: Color) = Glyph(
         Tab.Today -> Glyph.Clock
         Tab.Feed -> Glyph.Calendar
         Tab.Deadlines -> Glyph.Flag
-        Tab.Exams -> Glyph.Doc
+        Tab.Profile -> Glyph.User
         Tab.Search -> Glyph.Search
     },
     color,

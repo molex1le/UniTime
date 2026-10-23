@@ -273,7 +273,7 @@ fun TeacherPhoto(t: Teacher, size: Dp) {
     }
 }
 
-enum class Tab(val label: String) { Today("Сегодня"), Feed("Пары"), Deadlines("Дедлайны"), Exams("Сессия"), Search("Поиск") }
+enum class Tab(val label: String) { Today("Сегодня"), Feed("Пары"), Deadlines("Дедлайны"), Profile("Профиль"), Search("Поиск") }
 
 @Composable
 fun BottomNav(current: Tab, onSelect: (Tab) -> Unit) {

@@ -59,6 +59,7 @@ object Updater {
             postNotification(ctx, d)
         }
         updateWidgets(ctx, schedule, now, repo.subgroup, st.widgetDark)
+        runCatching { com.molex.nextpair.widgets.Widgets.renderAll(ctx, schedule, now, repo.subgroup, st.widgetDark) }
         // Если расписания нет, пробуем снова через 30 минут.
         val at = schedule?.nextChange(now, repo.subgroup) ?: now.plusMinutes(30)
         scheduleAlarm(ctx, at, PendingIntent.getBroadcast(ctx, 0, Intent(ctx, TickReceiver::class.java), FLAGS))
@@ -283,6 +284,8 @@ object Updater {
 /** Срабатывает по будильнику, при загрузке телефона и при смене времени. */
 class TickReceiver : BroadcastReceiver() {
     override fun onReceive(ctx: Context, intent: Intent) {
+        // После перезагрузки и обновления приложения будильники стираются — ставим заново.
+        if (intent.action != null) runCatching { IisWatch.schedule(ctx) }
         val pending = goAsync()
         Updater.refresh(ctx) { pending.finish() }
     }

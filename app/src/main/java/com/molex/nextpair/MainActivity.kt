@@ -66,6 +66,7 @@ sealed interface Overlay {
     data object SettingsPage : Overlay
     data object Friends : Overlay
     data object Account : Overlay
+    data object Exams : Overlay
 }
 
 class MainActivity : ComponentActivity() {
@@ -98,6 +99,7 @@ class MainActivity : ComponentActivity() {
         ) requestPermissions(arrayOf(Manifest.permission.POST_NOTIFICATIONS), 1)
 
         load(force = false)
+        IisWatch.schedule(this)
         setContent {
             val scheme = if (C.Dark) darkColorScheme(primary = C.Accent, background = C.Ground, surface = C.Card)
             else lightColorScheme(primary = C.Accent, background = C.Ground, surface = C.Card)
@@ -151,7 +153,9 @@ class MainActivity : ComponentActivity() {
 
     @Composable
     private fun App() {
-        var tab by remember { mutableStateOf(Tab.entries.getOrElse(st.startTab) { Tab.Today }) }
+        var tab by remember {
+            mutableStateOf(if (intent?.getBooleanExtra("openAccount", false) == true) Tab.Profile else Tab.entries.getOrElse(st.startTab) { Tab.Today })
+        }
         val stack = remember { mutableStateListOf<Overlay>() }
         var editing by remember { mutableStateOf<Deadline?>(null) }
         var now by remember { mutableStateOf(LocalDateTime.now()) }
@@ -193,6 +197,7 @@ class MainActivity : ComponentActivity() {
                     onAccount = { stack.add(Overlay.Account) },
                 )
                 Overlay.Account -> com.molex.nextpair.ui.AccountScreen(iis, onBack = back)
+                Overlay.Exams -> schedule?.let { s -> ExamsScreen(s, now, onBack = back) { openLesson(it, true) } } ?: LaunchedEffect(Unit) { back() }
                 Overlay.Friends -> {
                     val s = schedule
                     if (s != null) FriendsScreen(repo, s, repo.subgroup, now, onBack = back, onOpen = openTarget)
@@ -202,6 +207,7 @@ class MainActivity : ComponentActivity() {
                     Box(Modifier.weight(1f).fillMaxWidth()) {
                         val s = schedule
                         when {
+                            tab == Tab.Profile -> com.molex.nextpair.ui.AccountScreen(iis, onBack = null)
                             tab == Tab.Search -> SearchScreen(repo, openTarget) { stack.add(Overlay.Friends) }
                             tab == Tab.Deadlines -> DeadlinesScreen(
                                 deadlines, now,
@@ -216,11 +222,10 @@ class MainActivity : ComponentActivity() {
                             tab == Tab.Today -> TodayScreen(
                                 s, repo.subgroup, repo.group, now, deadlines,
                                 onSettings = openSettings,
-                                onAccount = { stack.add(Overlay.Account) },
+                                onExams = { stack.add(Overlay.Exams) },
                                 onDeadlines = { tab = Tab.Deadlines },
                             ) { openLesson(it, true) }
                             tab == Tab.Feed -> FeedScreen(s, repo.subgroup, now, deadlines) { openLesson(it, true) }
-                            tab == Tab.Exams -> ExamsScreen(s, now) { openLesson(it, true) }
                         }
                     }
                     BottomNav(tab) { tab = it }

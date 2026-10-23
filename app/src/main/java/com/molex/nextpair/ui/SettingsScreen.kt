@@ -25,6 +25,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import kotlinx.coroutines.launch
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
@@ -169,6 +170,9 @@ fun SettingsScreen(
             }
         }
 
+        item { Section("Новое в личном кабинете") }
+        item { IisNotifyCard(st) }
+
         item { Section("Виджет") }
         item { Card { Toggle("Тёмный виджет", null, st.widgetDark) { st.widgetDark = it; changed(notif = true) } } }
 
@@ -200,7 +204,7 @@ fun SettingsScreen(
 
         item {
             Text(
-                "Следующая пара · данные с iis.bsuir.by\nmade by molex1le",
+                "UniTime · данные с iis.bsuir.by\nmade by molex1le",
                 fontSize = 12.sp, color = C.Muted, lineHeight = 17.sp, modifier = Modifier.padding(top = 8.dp),
             )
         }
@@ -239,5 +243,66 @@ fun Toggle(title: String, sub: String?, on: Boolean, onChange: (Boolean) -> Unit
             if (sub != null) Text(sub, fontSize = 12.sp, color = C.Muted)
         }
         Switch(on, onChange, colors = SwitchDefaults.colors(checkedTrackColor = C.Accent, checkedThumbColor = C.OnAccent))
+    }
+}
+
+@OptIn(ExperimentalLayoutApi::class)
+@Composable
+private fun IisNotifyCard(st: Settings) {
+    val ctx = androidx.compose.ui.platform.LocalContext.current
+    val scope = androidx.compose.runtime.rememberCoroutineScope()
+    val iis = remember { com.molex.nextpair.Iis(ctx) }
+    var checking by remember { mutableStateOf(false) }
+    var last by remember { mutableStateOf(com.molex.nextpair.IisWatch.lastCheck(ctx)) }
+    var hasPw by remember { mutableStateOf(iis.hasSavedPassword) }
+    val reschedule = { com.molex.nextpair.IisWatch.schedule(ctx) }
+    Card {
+        if (!iis.loggedIn) {
+            Text("Войди на вкладке «Профиль», чтобы получать уведомления о новых оценках, пропусках и сообщениях.", fontSize = 14.sp, color = C.Ink)
+            return@Card
+        }
+        Toggle("Уведомлять о новом", "Оценки, пропуски, сообщения из IIS", st.iisNotify) { st.iisNotify = it; reschedule() }
+        if (st.iisNotify) {
+            Text("Проверять каждые", fontSize = 13.sp, color = C.Muted)
+            FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Settings.IIS_HOURS.forEach { h -> Choice("$h ч", st.iisHours == h) { st.iisHours = h; reschedule() } }
+            }
+            Toggle("Оценки и отметки", "Зачётка и журнал успеваемости", st.iisMarks) { st.iisMarks = it }
+            Toggle("Пропуски", null, st.iisOmissions) { st.iisOmissions = it }
+            Toggle("Сообщения из IIS", null, st.iisMessages) { st.iisMessages = it }
+            Toggle("Поощрения и взыскания", null, st.iisPenalties) { st.iisPenalties = it }
+        }
+        if (!hasPw) Text(
+            "Пароль не сохранён: когда сайт завершит сессию, проверки остановятся до следующего входа. " +
+                "Чтобы этого не было, выйди и войди снова с «Запомнить пароль».",
+            fontSize = 12.sp, color = C.Muted, lineHeight = 17.sp,
+        )
+        Text(
+            if (last == 0L) "Ещё не проверялось" else "Последняя проверка: ${SimpleDateFormat("d MMM, HH:mm", Locale("ru")).format(Date(last))}",
+            fontSize = 13.sp, color = C.Muted,
+        )
+        FlowRow(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            Choice(if (checking) "Проверяю…" else "Проверить сейчас", false) {
+                if (checking) return@Choice
+                checking = true
+                scope.launch {
+                    val found = kotlinx.coroutines.withContext(kotlinx.coroutines.Dispatchers.IO) {
+                        runCatching { com.molex.nextpair.IisWatch.check(ctx) }.getOrNull()
+                    }
+                    checking = false
+                    last = com.molex.nextpair.IisWatch.lastCheck(ctx)
+                    android.widget.Toast.makeText(
+                        ctx,
+                        when {
+                            found == null -> "Нет связи с iis.bsuir.by"
+                            found.isEmpty() -> "Ничего нового"
+                            else -> "Нового: ${found.size}"
+                        },
+                        android.widget.Toast.LENGTH_SHORT,
+                    ).show()
+                }
+            }
+            if (hasPw) Choice("Забыть пароль", false) { iis.forgetPassword(); hasPw = false }
+        }
     }
 }

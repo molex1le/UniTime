@@ -41,12 +41,21 @@ class Settings(ctx: Context) {
     var remindSound: Boolean get() = bool("remindSound", true); set(v) = put("remindSound", v)
     var notifyChanges: Boolean get() = bool("notifyChanges", true); set(v) = put("notifyChanges", v)
 
+    /** Уведомления о новом в личном кабинете IIS. */
+    var iisNotify: Boolean get() = bool("iisNotify", true); set(v) = put("iisNotify", v)
+    var iisHours: Int get() = int("iisHours", 4); set(v) = put("iisHours", v)
+    var iisMarks: Boolean get() = bool("iisMarks", true); set(v) = put("iisMarks", v)
+    var iisOmissions: Boolean get() = bool("iisOmissions", true); set(v) = put("iisOmissions", v)
+    var iisMessages: Boolean get() = bool("iisMessages", true); set(v) = put("iisMessages", v)
+    var iisPenalties: Boolean get() = bool("iisPenalties", true); set(v) = put("iisPenalties", v)
+
     var widgetDark: Boolean get() = bool("widgetDark", false); set(v) = put("widgetDark", v)
 
     companion object {
         val version = androidx.compose.runtime.mutableIntStateOf(0)
         val ACCENTS = listOf("Синий", "Зелёный", "Оранжевый", "Фиолетовый")
         val REMIND_OPTIONS = listOf(5, 10, 15, 30)
+        val IIS_HOURS = listOf(1, 2, 4, 8, 12)
 
         /** Номер пары БГУИР по времени начала. */
         fun pairNumber(start: java.time.LocalTime): Int? = when (start.toString()) {

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/w_root" android:layout_width="match_parent" android:layout_height="match_parent"
+    android:orientation="vertical" android:padding="16dp" android:background="@drawable/widget_bg">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:layout_marginBottom="4dp">
+        <TextView android:id="@+id/w_head" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:text="Дедлайны" android:textColor="#11151C" android:textSize="15sp" android:textStyle="bold"/>
+        <TextView android:id="@+id/w_count" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#2F4FD8" android:textSize="13sp" android:textStyle="bold" android:maxLines="1" android:ellipsize="end" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/row0" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingTop="4dp" android:paddingBottom="4dp" android:visibility="gone">
+        <TextView android:id="@+id/n0" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:textColor="#11151C" android:textSize="14sp" android:maxLines="1" android:ellipsize="end"/>
+        <TextView android:id="@+id/r0" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:textColor="#5B6472" android:textSize="13sp" android:textStyle="bold" android:maxLines="1"/>
+    </LinearLayout>
+    <LinearLayout android:id="@+id/row1" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingTop="4dp" android:paddingBottom="4dp" android:visibility="gone">
+        <TextView android:id="@+id/n1" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:textColor="#11151C" android:textSize="14sp" android:maxLines="1" android:ellipsize="end"/>
+        <TextView android:id="@+id/r1" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:textColor="#5B6472" android:textSize="13sp" android:textStyle="bold" android:maxLines="1"/>
+    </LinearLayout>
+    <LinearLayout android:id="@+id/row2" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingTop="4dp" android:paddingBottom="4dp" android:visibility="gone">
+        <TextView android:id="@+id/n2" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:textColor="#11151C" android:textSize="14sp" android:maxLines="1" android:ellipsize="end"/>
+        <TextView android:id="@+id/r2" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:textColor="#5B6472" android:textSize="13sp" android:textStyle="bold" android:maxLines="1"/>
+    </LinearLayout>
+    <LinearLayout android:id="@+id/row3" android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:paddingTop="4dp" android:paddingBottom="4dp" android:visibility="gone">
+        <TextView android:id="@+id/n3" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:textColor="#11151C" android:textSize="14sp" android:maxLines="1" android:ellipsize="end"/>
+        <TextView android:id="@+id/r3" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="8dp" android:textColor="#5B6472" android:textSize="13sp" android:textStyle="bold" android:maxLines="1"/>
+    </LinearLayout>
+    <TextView android:id="@+id/w_empty" android:layout_width="wrap_content" android:layout_height="wrap_content" android:textColor="#5B6472" android:textSize="14sp"  android:maxLines="1" android:ellipsize="end" android:visibility="gone"/>
+</LinearLayout>

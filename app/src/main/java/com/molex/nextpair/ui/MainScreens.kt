@@ -172,7 +172,7 @@ fun TodayScreen(
     now: LocalDateTime,
     deadlines: List<Deadline>,
     onSettings: () -> Unit,
-    onAccount: () -> Unit,
+    onExams: () -> Unit,
     onDeadlines: () -> Unit,
     onLesson: (Occurrence) -> Unit,
 ) {
@@ -188,7 +188,7 @@ fun TodayScreen(
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
                 ScreenTitle(dayTitle(today), "Сегодня")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    RoundButton(Glyph.User, "Личный кабинет", onAccount)
+                    RoundButton(Glyph.Doc, "Сессия", onExams)
                     RoundButton(Glyph.Gear, "Настройки", onSettings)
                 }
             }
@@ -484,9 +484,10 @@ private fun CompactRow(o: Occurrence, showGroups: Boolean, faded: Boolean, onCli
 // ---------- Сессия ----------
 
 @Composable
-fun ExamsScreen(s: Schedule, now: LocalDateTime, onLesson: (Occurrence) -> Unit) {
+fun ExamsScreen(s: Schedule, now: LocalDateTime, onBack: () -> Unit, onLesson: (Occurrence) -> Unit) {
     val today = now.toLocalDate()
-    LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+    LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
+        item { RoundButton(Glyph.Back, "Назад", onBack) }
         item { ScreenTitle(s.termStart?.let { "Семестр ${it.year}" }, "Сессия") }
         val start = s.examsStart
         if (start != null) item {

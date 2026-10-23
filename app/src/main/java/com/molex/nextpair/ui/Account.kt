@@ -44,6 +44,7 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.molex.nextpair.Iis
+import com.molex.nextpair.IisWatch
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.launch
@@ -53,32 +54,37 @@ import org.json.JSONObject
 import org.json.JSONTokener
 
 @Composable
-fun AccountScreen(iis: Iis, onBack: () -> Unit) {
+fun AccountScreen(iis: Iis, onBack: (() -> Unit)?) {
+    val ctx = LocalContext.current
     var loggedIn by remember { mutableStateOf(iis.loggedIn) }
     var open by remember { mutableStateOf<Iis.Section?>(null) }
     val section = open
     when {
         !loggedIn -> LoginScreen(iis, onBack) { loggedIn = true }
         section != null -> SectionScreen(iis, section, onBack = { open = null }) { loggedIn = false; open = null }
-        else -> CabinetHome(iis, onBack, onOpen = { open = it }) { iis.logout(); loggedIn = false }
+        else -> CabinetHome(iis, onBack, onOpen = { open = it }) {
+            Thread { iis.logout(); IisWatch.reset(ctx); IisWatch.schedule(ctx) }.start()
+            loggedIn = false
+        }
     }
 }
 
 @Composable
-private fun LoginScreen(iis: Iis, onBack: () -> Unit, onDone: () -> Unit) {
+private fun LoginScreen(iis: Iis, onBack: (() -> Unit)?, onDone: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var login by remember { mutableStateOf(iis.login) }
     var password by remember { mutableStateOf("") }
     var remember by remember { mutableStateOf(true) }
+    var savePw by remember { mutableStateOf(true) }
     var busy by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
     var redirect by remember { mutableStateOf<String?>(null) }
     val ok = login.isNotBlank() && password.isNotBlank() && !busy
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        item { RoundButton(Glyph.Back, "Назад", onBack) }
-        item { ScreenTitle("iis.bsuir.by", "Личный кабинет") }
+        if (onBack != null) item { RoundButton(Glyph.Back, "Назад", onBack) }
+        item { ScreenTitle("iis.bsuir.by", "Профиль") }
         item {
             Column(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(C.Card).padding(16.dp),
@@ -87,6 +93,7 @@ private fun LoginScreen(iis: Iis, onBack: () -> Unit, onDone: () -> Unit) {
                 Field(login, { login = it.trim() }, "Номер студенческого билета")
                 PasswordField(password, { password = it })
                 Toggle("Запомнить устройство", "Чтобы не входить каждый раз", remember) { remember = it }
+                Toggle("Запомнить пароль", "Нужно для уведомлений о новых оценках и пропусках", savePw) { savePw = it }
                 if (error != null) Text(error!!, color = C.Error, fontSize = 14.sp)
                 Box(
                     Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(14.dp))
@@ -94,11 +101,18 @@ private fun LoginScreen(iis: Iis, onBack: () -> Unit, onDone: () -> Unit) {
                         .clickable(enabled = ok) {
                             busy = true; error = null
                             scope.launch {
-                                val r = withContext(Dispatchers.IO) { runCatching { iis.login(login, password, remember) } }
+                                val r = withContext(Dispatchers.IO) { runCatching { iis.login(login, password, remember, savePw) } }
                                 busy = false
                                 r.onFailure { error = "Нет связи с iis.bsuir.by" }
                                 when (val res = r.getOrNull()) {
-                                    Iis.LoginResult.Ok -> { password = ""; onDone() }
+                                    Iis.LoginResult.Ok -> {
+                                        password = ""
+                                        IisWatch.reset(ctx)
+                                        IisWatch.schedule(ctx)
+                                        // Первая проверка запоминает текущее состояние, без уведомлений.
+                                        Thread { runCatching { IisWatch.check(ctx) } }.start()
+                                        onDone()
+                                    }
                                     is Iis.LoginResult.Redirect -> redirect = res.url
                                     is Iis.LoginResult.Failed -> error = res.message
                                     null -> {}
@@ -130,7 +144,9 @@ private fun LoginScreen(iis: Iis, onBack: () -> Unit, onDone: () -> Unit) {
         item {
             Text(
                 "Логин и пароль отправляются только на iis.bsuir.by — как при входе на сайте. " +
-                    "Пароль в приложении не сохраняется: хранится только сессия, и «Выйти» её стирает.",
+                    "Если включить «Запомнить пароль», он хранится на телефоне в зашифрованном виде " +
+                    "(ключ в защищённом хранилище Android) и нужен, чтобы входить заново, когда сайт завершит сессию. " +
+                    "«Выйти» стирает и сессию, и пароль.",
                 fontSize = 12.sp, color = C.Muted, lineHeight = 17.sp,
             )
         }
@@ -157,10 +173,10 @@ private fun PasswordField(value: String, onChange: (String) -> Unit) {
 }
 
 @Composable
-private fun CabinetHome(iis: Iis, onBack: () -> Unit, onOpen: (Iis.Section) -> Unit, onLogout: () -> Unit) {
+private fun CabinetHome(iis: Iis, onBack: (() -> Unit)?, onOpen: (Iis.Section) -> Unit, onLogout: () -> Unit) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
-        item { RoundButton(Glyph.Back, "Назад", onBack) }
-        item { ScreenTitle("вход: ${iis.login}", "Личный кабинет") }
+        if (onBack != null) item { RoundButton(Glyph.Back, "Назад", onBack) }
+        item { ScreenTitle("личный кабинет IIS · ${iis.login}", "Профиль") }
         item {
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(C.Card)) {
                 Iis.SECTIONS.forEachIndexed { i, s ->
