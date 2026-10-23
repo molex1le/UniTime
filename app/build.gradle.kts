@@ -28,6 +28,15 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
+
+    // APK сразу с версией в имени: NextPair-3.2.apk
+    applicationVariants.all {
+        val variant = this
+        outputs.all {
+            (this as com.android.build.gradle.internal.api.BaseVariantOutputImpl).outputFileName =
+                "NextPair-${variant.versionName}.apk"
+        }
+    }
 }
 
 dependencies {

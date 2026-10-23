@@ -10,4 +10,4 @@ Android-приложение с расписанием БГУИР: следую�
 ./gradlew assembleDebug
 ```
 
-APK: `app/build/outputs/apk/debug/app-debug.apk`. Нужны JDK 17+ и Android SDK (путь в `local.properties`, `sdk.dir=...`).
+APK: `app/build/outputs/apk/debug/NextPair-<версия>.apk`. Нужны JDK 17+ и Android SDK (путь в `local.properties`, `sdk.dir=...`).
