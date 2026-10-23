@@ -81,7 +81,7 @@ private val ACCENT = listOf(
 object C {
     var palette by mutableStateOf(LIGHT)
     var accentIndex by mutableStateOf(0)
-    var shortNames by mutableStateOf(false)
+    var shortNames by mutableStateOf(true)
     var pairNumbers by mutableStateOf(true)
 
     fun apply(theme: Int, systemDark: Boolean, accent: Int, short: Boolean, numbers: Boolean) {

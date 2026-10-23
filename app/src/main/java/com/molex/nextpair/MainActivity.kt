@@ -65,11 +65,13 @@ sealed interface Overlay {
     data class Other(val t: Target) : Overlay
     data object SettingsPage : Overlay
     data object Friends : Overlay
+    data object Account : Overlay
 }
 
 class MainActivity : ComponentActivity() {
     private lateinit var repo: Repo
     private lateinit var st: Settings
+    private lateinit var iis: Iis
     private var schedule by mutableStateOf<Schedule?>(null)
     private var loading by mutableStateOf(false)
     private var deadlines by mutableStateOf<List<Deadline>>(emptyList())
@@ -86,6 +88,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         repo = Repo(this)
         st = Settings(this)
+        iis = Iis(this)
         applyLook()
         schedule = repo.load()
         deadlines = repo.deadlines()
@@ -187,7 +190,9 @@ class MainActivity : ComponentActivity() {
                     onBattery = { askBattery() },
                     onRefresh = { load(force = true) },
                     onCalendar = { calendar(it) },
+                    onAccount = { stack.add(Overlay.Account) },
                 )
+                Overlay.Account -> com.molex.nextpair.ui.AccountScreen(iis, onBack = back)
                 Overlay.Friends -> {
                     val s = schedule
                     if (s != null) FriendsScreen(repo, s, repo.subgroup, now, onBack = back, onOpen = openTarget)
@@ -211,6 +216,7 @@ class MainActivity : ComponentActivity() {
                             tab == Tab.Today -> TodayScreen(
                                 s, repo.subgroup, repo.group, now, deadlines,
                                 onSettings = openSettings,
+                                onAccount = { stack.add(Overlay.Account) },
                                 onDeadlines = { tab = Tab.Deadlines },
                             ) { openLesson(it, true) }
                             tab == Tab.Feed -> FeedScreen(s, repo.subgroup, now, deadlines) { openLesson(it, true) }

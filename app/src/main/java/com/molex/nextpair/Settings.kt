@@ -24,7 +24,7 @@ class Settings(ctx: Context) {
     var theme: Int get() = int("theme", 0); set(v) = put("theme", v)
     /** Индекс в [ACCENTS]. */
     var accent: Int get() = int("accent", 0); set(v) = put("accent", v)
-    var shortNames: Boolean get() = bool("shortNames", false); set(v) = put("shortNames", v)
+    var shortNames: Boolean get() = bool("shortNames", true); set(v) = put("shortNames", v)
     var pairNumbers: Boolean get() = bool("pairNumbers", true); set(v) = put("pairNumbers", v)
     var startTab: Int get() = int("startTab", 0); set(v) = put("startTab", v)
 

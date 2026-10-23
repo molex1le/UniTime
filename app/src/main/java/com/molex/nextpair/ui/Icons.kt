@@ -16,7 +16,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 
-enum class Glyph { Clock, Calendar, Doc, Search, Back, Bell, Star, StarFilled, Chevron, Cap, Gear, Plus, Check, People, Pin, EyeOff, Flag, Trash }
+enum class Glyph { Clock, Calendar, Doc, Search, Back, Bell, Star, StarFilled, Chevron, Cap, Gear, Plus, Check, People, Pin, EyeOff, Flag, Trash, User }
 
 /** Линейные иконки 24×24, как в макете. */
 @Composable
@@ -103,6 +103,10 @@ fun Glyph(g: Glyph, color: Color, size: Dp = 24.dp) {
             Glyph.Trash -> {
                 line(4f, 7f, 20f, 7f); line(9f, 7f, 9f, 4f, 15f, 4f, 15f, 7f)
                 line(6f, 7f, 7f, 20f, 17f, 20f, 18f, 7f)
+            }
+            Glyph.User -> {
+                drawCircle(color, 4f * k, Offset(12f * k, 8f * k), style = st)
+                drawPath(Path().apply { moveTo(4f * k, 21f * k); cubicTo(4f * k, 13f * k, 20f * k, 13f * k, 20f * k, 21f * k) }, color, style = st)
             }
             Glyph.Cap -> {
                 line(12f, 4f, 2f, 9f, 12f, 14f, 22f, 9f, close = true)

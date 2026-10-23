@@ -51,6 +51,7 @@ fun SettingsScreen(
     onBattery: () -> Unit,
     onRefresh: () -> Unit,
     onCalendar: (add: Boolean) -> Unit,
+    onAccount: () -> Unit,
 ) {
     fun changed(look: Boolean = false, notif: Boolean = false) {
         if (look) onLookChanged()
@@ -63,6 +64,20 @@ fun SettingsScreen(
         item { RoundButton(Glyph.Back, "Назад", onBack) }
         item { ScreenTitle(null, "Настройки") }
 
+        item {
+            Row(
+                Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(C.Card).clickable(onClick = onAccount).padding(16.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(12.dp),
+            ) {
+                Glyph(Glyph.User, C.Accent, 24.dp)
+                Column(Modifier.weight(1f)) {
+                    Text("Личный кабинет IIS", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = C.Ink)
+                    Text("Оценки, пропуски, льготы, взыскания", fontSize = 12.sp, color = C.Muted)
+                }
+                Glyph(Glyph.Chevron, C.Chevron, 18.dp)
+            }
+        }
         item { Section("Группа") }
         item {
             Card {
@@ -89,7 +104,7 @@ fun SettingsScreen(
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Settings.ACCENTS.forEachIndexed { i, name -> Choice(name, st.accent == i) { st.accent = i; changed(look = true) } }
                 }
-                Toggle("Короткие названия", "«КС» вместо «Компьютерные сети»", st.shortNames) { st.shortNames = it; changed(look = true) }
+                Toggle("Короткие названия в списках", "«МатПрог», как в БГУИР; в карточке пары — полностью", st.shortNames) { st.shortNames = it; changed(look = true) }
                 Toggle("Номера пар", "«3 пара» рядом со временем", st.pairNumbers) { st.pairNumbers = it; changed(look = true) }
                 Text("Открывать при запуске", fontSize = 13.sp, color = C.Muted)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {

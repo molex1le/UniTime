@@ -95,11 +95,30 @@ fun mondayOf(d: LocalDate): LocalDate =
     // В воскресенье показываем уже следующую неделю.
     if (d.dayOfWeek == DayOfWeek.SUNDAY) d.plusDays(1) else d.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
 
+/** Минуты между концом предыдущей пары и началом этой (может быть ≤ 0 у параллельных подгрупп). */
+fun gapBefore(list: List<Occurrence>, i: Int): Long? =
+    if (i == 0) null else Duration.between(list[i - 1].endAt, list[i].startAt).toMinutes()
+
 /** Свободное время между парами длиннее обычной перемены (30 мин у БГУИР). */
-fun windowBefore(list: List<Occurrence>, i: Int): Long? {
-    if (i == 0) return null
-    val gap = Duration.between(list[i - 1].endAt, list[i].startAt).toMinutes()
-    return gap.takeIf { it > 30 }
+fun windowBefore(list: List<Occurrence>, i: Int): Long? = gapBefore(list, i)?.takeIf { it > 30 }
+
+/** Что рисовать между парами: обычную перемену, окно или ничего. */
+@Composable
+fun Between(gap: Long?) {
+    when {
+        gap == null || gap <= 0 -> {}
+        gap > 30 -> WindowRow(gap)
+        else -> BreakRow(gap)
+    }
+}
+
+@Composable
+fun BreakRow(minutes: Long) {
+    Text(
+        "перемена $minutes мин",
+        fontSize = 11.sp, color = C.Muted, textAlign = TextAlign.Center,
+        modifier = Modifier.fillMaxWidth().padding(vertical = 3.dp),
+    )
 }
 
 @Composable
@@ -152,6 +171,7 @@ fun TodayScreen(
     now: LocalDateTime,
     deadlines: List<Deadline>,
     onSettings: () -> Unit,
+    onAccount: () -> Unit,
     onDeadlines: () -> Unit,
     onLesson: (Occurrence) -> Unit,
 ) {
@@ -166,7 +186,10 @@ fun TodayScreen(
         item {
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
                 ScreenTitle(dayTitle(today), "Сегодня")
-                RoundButton(Glyph.Gear, "Настройки", onSettings)
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    RoundButton(Glyph.User, "Личный кабинет", onAccount)
+                    RoundButton(Glyph.Gear, "Настройки", onSettings)
+                }
             }
         }
         item {
@@ -224,14 +247,16 @@ fun TodayScreen(
             }
         }
         if (lessons.isEmpty()) item { EmptyCard("Пар нет", "Можно выдохнуть. Дальше — на вкладке «Пары».") }
-        lessons.forEachIndexed { i, o ->
-            windowBefore(lessons, i)?.let { item { WindowRow(it) } }
-            item {
-                val dl = deadlines.count { !it.done && it.subject == o.lesson.subject && !it.due.isBefore(now) }
-                LessonRow(
-                    o, faded = o.endAt.isBefore(now), highlighted = cur == o, showGroups = false,
-                    extra = if (dl > 0) "Дедлайнов по предмету: $dl" else null,
-                ) { onLesson(o) }
+        if (lessons.isNotEmpty()) item {
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                lessons.forEachIndexed { i, o ->
+                    Between(gapBefore(lessons, i))
+                    val dl = deadlines.count { !it.done && it.subject == o.lesson.subject && !it.due.isBefore(now) }
+                    LessonRow(
+                        o, faded = o.endAt.isBefore(now), highlighted = cur == o, showGroups = false,
+                        extra = if (dl > 0) "Дедлайнов по предмету: $dl" else null,
+                    ) { onLesson(o) }
+                }
             }
         }
     }
@@ -256,7 +281,7 @@ private fun HeroCard(o: Occurrence, isNow: Boolean, now: LocalDateTime, onClick:
             )
         }
         Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(l.title(), fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White, lineHeight = 26.sp)
+            Text(l.subjectFull.ifBlank { l.subject }, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White, lineHeight = 26.sp)
             Text(listOf(typeName, l.rooms, l.teacher).filter { it.isNotBlank() }.joinToString(" · "), fontSize = 14.sp, color = C.HeroMuted)
         }
         Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
@@ -410,10 +435,11 @@ private fun DayBlock(date: LocalDate, list: List<Occurrence>, now: LocalDateTime
         }
         Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(C.Card)) {
             list.forEachIndexed { i, o ->
-                if (i > 0) {
-                    val w = windowBefore(list, i)
-                    if (w != null) Box(Modifier.padding(vertical = 4.dp)) { WindowRow(w) }
-                    else Box(Modifier.fillMaxWidth().height(1.dp).background(C.Divider))
+                val gap = gapBefore(list, i)
+                when {
+                    gap == null -> {}
+                    gap <= 0 -> Box(Modifier.fillMaxWidth().height(1.dp).background(C.Divider))
+                    else -> Box(Modifier.padding(vertical = 2.dp)) { Between(gap) }
                 }
                 CompactRow(o, showGroups, faded = o.endAt.isBefore(now)) { onLesson(o) }
             }
@@ -429,14 +455,15 @@ private fun CompactRow(o: Occurrence, showGroups: Boolean, faded: Boolean, onCli
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        Column(Modifier.size(width = 42.dp, height = 34.dp), verticalArrangement = Arrangement.Center) {
-            Text(l.start.format(TIME), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = if (faded) C.Muted else C.Ink)
-            val n = com.molex.nextpair.Settings.pairNumber(l.start)
-            if (C.pairNumbers && n != null) Text("$n пара", fontSize = 10.sp, color = C.Muted)
+        Column(Modifier.size(width = 46.dp, height = 36.dp), verticalArrangement = Arrangement.Center) {
+            Text(l.start.format(TIME), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = if (faded) C.Muted else C.Ink)
+            Text(l.end.format(TIME), fontSize = 12.sp, color = C.Muted)
         }
         Column(Modifier.weight(1f)) {
             Text(l.title(), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = if (faded) C.Muted else C.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            val n = com.molex.nextpair.Settings.pairNumber(l.start)
             val sub = listOfNotNull(
+                if (C.pairNumbers && n != null) "$n пара" else null,
                 if (showGroups) l.groups.ifBlank { null } else null,
                 if (l.subgroup != 0) "п/г ${l.subgroup}" else null,
             ).joinToString(" · ")
