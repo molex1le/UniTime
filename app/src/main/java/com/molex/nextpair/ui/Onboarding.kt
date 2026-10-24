@@ -82,7 +82,7 @@ private fun Welcome(onIis: () -> Unit, onManual: () -> Unit) {
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         // Иконка приложения: тёмный фон + векторный рисунок (адаптивную иконку Compose целиком не рисует).
-        Box(Modifier.size(104.dp).clip(RoundedCornerShape(28.dp)).background(androidx.compose.ui.graphics.Color(0xFF0E1526))) {
+        Box(Modifier.size(104.dp).clip(RoundedCornerShape(28.dp)).background(androidx.compose.ui.graphics.Color(0xFF2B5CE6))) {
             Image(painterResource(R.drawable.ic_launcher_foreground), null, Modifier.fillMaxSize())
         }
         Spacer(Modifier.height(20.dp))
