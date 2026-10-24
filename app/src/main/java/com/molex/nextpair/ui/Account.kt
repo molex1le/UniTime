@@ -175,6 +175,13 @@ private fun PasswordField(value: String, onChange: (String) -> Unit) {
 
 @Composable
 private fun CabinetHome(iis: Iis, onBack: (() -> Unit)?, onOpen: (Iis.Section) -> Unit, onLogout: () -> Unit) {
+    // Пока смотришь меню, в фоне подтягиваем самые нужные разделы — к нажатию они уже готовы.
+    LaunchedEffect(Unit) {
+        withContext(Dispatchers.IO) {
+            val wanted = setOf(Iis.Kind.Markbook, Iis.Kind.Performance, Iis.Kind.Omissions, Iis.Kind.Profile)
+            iis.prefetch(Iis.SECTIONS.filter { it.kind in wanted }.flatMap { it.paths })
+        }
+    }
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         if (onBack != null) item { RoundButton(Glyph.Back, "Назад", onBack) }
         item { ScreenTitle("личный кабинет IIS · ${iis.login}", "Профиль") }
@@ -221,33 +228,69 @@ fun IisSectionScreen(iis: Iis, kind: Iis.Kind, onBack: () -> Unit) {
 @Composable
 private fun SectionScreen(iis: Iis, section: Iis.Section, onBack: () -> Unit, onExpired: () -> Unit) {
     val ctx = LocalContext.current
-    var results by remember(section) { mutableStateOf<List<Iis.Response?>?>(null) }
-    var failed by remember(section) { mutableStateOf(false) }
-    LaunchedEffect(section) {
-        runCatching {
-            results = withContext(Dispatchers.IO) {
-                kotlinx.coroutines.coroutineScope {
-                    section.paths.map { p -> async { runCatching { iis.get(p) }.getOrNull() } }.map { it.await() }
-                }
-            }
-        }.onFailure { failed = true }
+    // Что сейчас на экране: ответы, их разбор и время получения.
+    var shown by remember(section) { mutableStateOf<List<Iis.Response?>?>(null) }
+    var parsed by remember(section) { mutableStateOf<List<Any?>>(emptyList()) }
+    var shownAt by remember(section) { mutableStateOf(0L) }
+    var refreshing by remember(section) { mutableStateOf(true) }
+    var offline by remember(section) { mutableStateOf(false) }
+    var expired by remember(section) { mutableStateOf(false) }
+
+    suspend fun show(rs: List<Iis.Response?>, at: Long) {
+        // Разбор JSON — не в главном потоке, чтобы экран не подтормаживал.
+        parsed = withContext(Dispatchers.Default) {
+            rs.map { r -> r?.takeIf { it.code in 200..299 }?.let { runCatching { JSONTokener(it.body).nextValue() }.getOrNull() } }
+        }
+        shown = rs
+        shownAt = at
     }
-    val rs = results
+
+    LaunchedEffect(section) {
+        // 1) Сразу — то, что сохранено с прошлого раза.
+        val cached = withContext(Dispatchers.IO) { section.paths.map { iis.cached(it) } }
+        if (cached.any { it != null }) show(cached.map { it?.first }, cached.mapNotNull { it?.second }.minOrNull() ?: 0L)
+        // 2) В фоне — свежие данные с сервера.
+        val fresh = withContext(Dispatchers.IO) {
+            kotlinx.coroutines.coroutineScope {
+                section.paths.map { p -> async { runCatching { iis.get(p) }.getOrNull() } }.map { it.await() }
+            }
+        }
+        refreshing = false
+        when {
+            fresh.all { it == null } -> offline = true
+            fresh.any { it?.code == 401 } || fresh.all { it?.code == 403 } -> expired = true
+            else -> show(fresh.mapIndexed { i, r -> if (r == null && cached[i] != null) cached[i]!!.first else r }, System.currentTimeMillis())
+        }
+    }
+
+    val rs = shown
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
         item { RoundButton(Glyph.Back, "Назад", onBack) }
-        item { ScreenTitle(null, section.title) }
+        item {
+            val status = when {
+                refreshing && rs != null -> "обновляю…"
+                offline && rs != null -> "нет связи · данные от ${ago(shownAt)}"
+                rs != null && shownAt > 0 -> "обновлено ${ago(shownAt)}"
+                else -> null
+            }
+            ScreenTitle(status, section.title)
+        }
         when {
-            failed || (rs != null && rs.all { it == null }) -> item { Text("Нет связи с iis.bsuir.by", color = C.Error, fontSize = 14.sp) }
-            rs == null -> item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = C.Accent) } }
-            rs.any { it?.code == 401 } || rs.all { it?.code == 403 } -> item {
+            rs == null && refreshing -> item { Box(Modifier.fillMaxWidth().padding(24.dp), contentAlignment = Alignment.Center) { CircularProgressIndicator(color = C.Accent) } }
+            rs == null && expired -> item {
                 Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
                     Text("Сессия закончилась — нужно войти заново.", color = C.Ink, fontSize = 15.sp)
                     Choice("Войти", true, onExpired)
                 }
             }
+            rs == null -> item { Text("Нет связи с iis.bsuir.by", color = C.Error, fontSize = 14.sp) }
             else -> {
-                // Неуспешный ответ одного из запросов просто даёт пустой кусок раздела.
-                val parsed = rs.map { r -> r?.takeIf { it.code in 200..299 }?.let { runCatching { JSONTokener(it.body).nextValue() }.getOrNull() } }
+                if (expired) item {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
+                        Text("Сессия закончилась — показаны сохранённые данные.", color = C.Muted, fontSize = 13.sp, modifier = Modifier.weight(1f))
+                        Choice("Войти", true, onExpired)
+                    }
+                }
                 val first = parsed.firstOrNull()
                 item {
                     when (section.kind) {
@@ -277,6 +320,18 @@ private fun SectionScreen(iis: Iis, section: Iis.Section, onBack: () -> Unit, on
                 }
             }
         }
+    }
+}
+
+/** «только что», «5 мин назад», «вчера в 18:20». */
+private fun ago(at: Long): String {
+    if (at <= 0) return "давно"
+    val min = (System.currentTimeMillis() - at) / 60_000
+    return when {
+        min < 1 -> "только что"
+        min < 60 -> "$min мин назад"
+        min < 24 * 60 -> "${min / 60} ч назад"
+        else -> java.text.SimpleDateFormat("d MMM, HH:mm", java.util.Locale("ru")).format(java.util.Date(at))
     }
 }
 

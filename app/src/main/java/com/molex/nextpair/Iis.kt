@@ -22,6 +22,9 @@ import java.net.URL
 class Iis(ctx: Context) {
     private val prefs = ctx.getSharedPreferences("iis", Context.MODE_PRIVATE)
 
+    /** Последние успешные ответы кабинета — чтобы разделы открывались мгновенно. Стираются при выходе. */
+    private val cacheDir = java.io.File(ctx.filesDir, "iis_cache")
+
     sealed interface LoginResult {
         data object Ok : LoginResult
         /** Сайт просит что-то подтвердить у себя (код 280). */
@@ -36,6 +39,8 @@ class Iis(ctx: Context) {
     val hasSavedPassword: Boolean get() = prefs.contains("pw")
 
     fun login(username: String, password: String, remember: Boolean, savePassword: Boolean = false): LoginResult {
+        // Другой аккаунт — чужие сохранённые ответы не показываем.
+        if (username != login) cacheDir.deleteRecursively()
         prefs.edit().remove("cookies").remove("ok").remove("pw").apply()
         val body = JSONObject().put("username", username).put("password", password).put("rememberDevice", remember)
         val r = request("POST", "/auth/login", body.toString())
@@ -63,6 +68,27 @@ class Iis(ctx: Context) {
     fun logout() {
         runCatching { request("GET", "/auth/logout") }
         prefs.edit().clear().apply()
+        cacheDir.deleteRecursively()
+    }
+
+    private fun cacheFile(path: String): java.io.File {
+        val hash = java.security.MessageDigest.getInstance("SHA-1").digest(path.toByteArray()).joinToString("") { "%02x".format(it) }
+        return java.io.File(cacheDir, "$hash.json")
+    }
+
+    /** Сохранённый ответ и когда он получен (мс), если есть. */
+    fun cached(path: String): Pair<Response, Long>? {
+        val f = cacheFile(path)
+        if (!f.exists()) return null
+        return runCatching { Response(200, f.readText()) to f.lastModified() }.getOrNull()
+    }
+
+    /** Подгрузить разделы заранее, если сохранённое старше [maxAgeMs]. Вызывать не из главного потока. */
+    fun prefetch(paths: List<String>, maxAgeMs: Long = 2 * 60_000L) {
+        paths.forEach { p ->
+            val age = cached(p)?.let { System.currentTimeMillis() - it.second } ?: Long.MAX_VALUE
+            if (age > maxAgeMs) runCatching { get(p) }
+        }
     }
 
     fun forgetPassword() = prefs.edit().remove("pw").apply()
@@ -71,13 +97,25 @@ class Iis(ctx: Context) {
      * GET к API кабинета. 401/403 — сессия кончилась: если пароль сохранён, входим заново
      * и повторяем запрос, иначе сбрасываем вход.
      */
-    fun get(path: String): Response {
+    fun get(path: String): Response = fetch(path).also { r ->
+        if (r.code in 200..299) runCatching {
+            cacheDir.mkdirs()
+            cacheFile(path).writeText(r.body)
+        }
+    }
+
+    private fun fetch(path: String): Response {
         val r = request("GET", path)
         if (r.code != 401 && r.code != 403) return r
-        prefs.edit().putBoolean("ok", false).apply()
-        val pw = prefs.getString("pw", null)?.let { runCatching { decrypt(it) }.getOrNull() } ?: return r
-        val again = login(login, pw, remember = true, savePassword = true)
-        return if (again is LoginResult.Ok) request("GET", path) else r
+        // Перезаход один на всех: параллельные запросы ждут его и повторяют уже с новой сессией.
+        synchronized(RELOGIN) {
+            val retry = request("GET", path)
+            if (retry.code != 401 && retry.code != 403) return retry
+            prefs.edit().putBoolean("ok", false).apply()
+            val pw = prefs.getString("pw", null)?.let { runCatching { decrypt(it) }.getOrNull() } ?: return r
+            val again = login(login, pw, remember = true, savePassword = true)
+            return if (again is LoginResult.Ok) request("GET", path) else r
+        }
     }
 
     // --- Шифрование пароля ключом, который не покидает защищённое хранилище телефона ---
@@ -155,6 +193,7 @@ class Iis(ctx: Context) {
 
     companion object {
         private const val KEY_ALIAS = "nextpair_iis"
+        private val RELOGIN = Any()
 
         val SECTIONS = listOf(
             Section("Профиль", Kind.Profile, listOf("/auth/user")),
