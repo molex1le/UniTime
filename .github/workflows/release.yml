@@ -1,7 +1,7 @@
 name: Релиз
 
 # Ставишь тег и пушишь его — GitHub собирает подписанный APK и создаёт релиз
-# здесь и в публичном molex1le/UniTime (оттуда приложение узнаёт об обновлениях).
+# (отсюда приложение узнаёт об обновлениях).
 # Текст тега = «что нового» для пользователей:
 #   git tag -a v3.8 -m "- Починил …" && git push origin v3.8
 # Строка [важно] в тексте делает обновление обязательным.
@@ -53,20 +53,12 @@ jobs:
           if ! grep -q '[^[:space:]]' "$RUNNER_TEMP/notes.md"; then echo "Исправления и улучшения." > "$RUNNER_TEMP/notes.md"; fi
           cat "$RUNNER_TEMP/notes.md"
 
-      - name: Релиз в NextPair
+      - name: Релиз на GitHub
         uses: softprops/action-gh-release@v2
         with:
           name: UniTime ${{ github.ref_name }}
           files: app/build/outputs/apk/release/UniTime-*.apk
           body_path: ${{ runner.temp }}/notes.md
-
-      - name: Релиз в публичном UniTime (для обновлений в приложении)
-        env:
-          GH_TOKEN: ${{ secrets.UNITIME_RELEASE_TOKEN }}
-        run: |
-          if [ -z "$GH_TOKEN" ]; then echo "Нет секрета UNITIME_RELEASE_TOKEN — пропускаю"; exit 0; fi
-          gh release create "$GITHUB_REF_NAME" app/build/outputs/apk/release/UniTime-*.apk \
-            -R molex1le/UniTime --title "UniTime ${GITHUB_REF_NAME#v}" --notes-file "$RUNNER_TEMP/notes.md"
 
       - name: Удалить ключ с машины сборки
         if: always()

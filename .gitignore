@@ -12,3 +12,8 @@ captures/
 *.aab
 
 .DS_Store
+
+# Ключ подписи — никогда не коммитить
+*.jks
+*.keystore
+NextPair-keys/
