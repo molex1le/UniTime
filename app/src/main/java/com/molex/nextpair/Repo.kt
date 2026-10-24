@@ -50,7 +50,7 @@ class Repo(private val ctx: Context) {
     private val cache = File(ctx.filesDir, "schedule.json")
 
     var group: String
-        get() = prefs.getString("group", "572302")!!
+        get() = prefs.getString("group", null) ?: prefs.getString("cachedGroup", null) ?: ""
         set(v) = prefs.edit().putString("group", v).apply()
 
     /** 0 — все подгруппы, 1 или 2 — только своя. */
@@ -59,6 +59,8 @@ class Repo(private val ctx: Context) {
         set(v) = prefs.edit().putInt("subgroup", v).apply()
 
     val lastFetch: Long get() = prefs.getLong("fetchedAt", 0)
+
+    val hasCache: Boolean get() = cache.exists() && prefs.getString("cachedGroup", null) != null
 
     fun isStale() = System.currentTimeMillis() - lastFetch > 12 * 3600_000L ||
         prefs.getString("cachedGroup", null) != group

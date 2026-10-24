@@ -20,6 +20,9 @@ class Settings(ctx: Context) {
         version.intValue++
     }
 
+    /** Первый запуск пройден (выбрана группа). */
+    var onboarded: Boolean get() = bool("onboarded", false); set(v) = put("onboarded", v)
+
     /** Секретная тема открыта комбинацией недель. */
     var neonUnlocked: Boolean get() = bool("neonUnlocked", false); set(v) = put("neonUnlocked", v)
 

@@ -54,15 +54,16 @@ import org.json.JSONObject
 import org.json.JSONTokener
 
 @Composable
-fun AccountScreen(iis: Iis, onBack: (() -> Unit)?) {
+fun AccountScreen(iis: Iis, onBack: (() -> Unit)?, onAppSettings: () -> Unit) {
     val ctx = LocalContext.current
     var loggedIn by remember { mutableStateOf(iis.loggedIn) }
     var open by remember { mutableStateOf<Iis.Section?>(null) }
+    androidx.activity.compose.BackHandler(enabled = open != null) { open = null }
     val section = open
     when {
         !loggedIn -> LoginScreen(iis, onBack) { loggedIn = true }
         section != null -> SectionScreen(iis, section, onBack = { open = null }) { loggedIn = false; open = null }
-        else -> CabinetHome(iis, onBack, onOpen = { open = it }) {
+        else -> CabinetHome(iis, onBack, onOpen = { if (it.kind == Iis.Kind.Settings) onAppSettings() else open = it }) {
             Thread { iis.logout(); IisWatch.reset(ctx); IisWatch.schedule(ctx) }.start()
             loggedIn = false
         }
@@ -70,7 +71,7 @@ fun AccountScreen(iis: Iis, onBack: (() -> Unit)?) {
 }
 
 @Composable
-private fun LoginScreen(iis: Iis, onBack: (() -> Unit)?, onDone: () -> Unit) {
+internal fun LoginScreen(iis: Iis, onBack: (() -> Unit)?, onDone: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var login by remember { mutableStateOf(iis.login) }
@@ -208,6 +209,13 @@ private fun glyphFor(k: Iis.Kind) = when (k) {
     Iis.Kind.Library -> Glyph.Calendar
     Iis.Kind.Notifications -> Glyph.Bell
     Iis.Kind.Settings -> Glyph.Gear
+}
+
+/** Отдельный раздел кабинета (например, «Пароль и контакты» из общих настроек). */
+@Composable
+fun IisSectionScreen(iis: Iis, kind: Iis.Kind, onBack: () -> Unit) {
+    val section = Iis.SECTIONS.first { it.kind == kind }
+    SectionScreen(iis, section, onBack, onExpired = onBack)
 }
 
 @Composable

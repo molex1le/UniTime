@@ -123,9 +123,11 @@ fun BreakRow(minutes: Long) {
 }
 
 @Composable
-fun EmptyCard(title: String, text: String, glyph: Glyph = Glyph.Calendar) {
+fun EmptyCard(title: String, text: String, glyph: Glyph = Glyph.Calendar, onClick: (() -> Unit)? = null) {
+    var m = Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(C.Card)
+    if (onClick != null) m = m.clickable(onClick = onClick)
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(C.Card).padding(horizontal = 20.dp, vertical = 28.dp),
+        m.padding(horizontal = 20.dp, vertical = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
@@ -421,12 +423,11 @@ fun ScheduleFeed(
         }
         val away by remember { derivedStateOf { state.firstVisibleItemIndex > 3 } }
         if (away) {
-            Text(
-                "К сегодня",
-                color = C.OnAccent, fontSize = 14.sp, fontWeight = FontWeight.Bold,
-                modifier = Modifier.align(Alignment.BottomEnd).padding(20.dp).clip(RoundedCornerShape(50)).background(C.Accent)
-                    .clickable { scope.launch { state.animateScrollToItem(0) } }.padding(horizontal = 18.dp, vertical = 12.dp),
-            )
+            Box(
+                Modifier.align(Alignment.BottomEnd).padding(20.dp).size(52.dp).clip(CircleShape).background(C.Accent)
+                    .clickable(onClickLabel = "К сегодня") { scope.launch { state.animateScrollToItem(0) } },
+                contentAlignment = Alignment.Center,
+            ) { Glyph(Glyph.ArrowUp, C.OnAccent, 26.dp) }
         }
     }
 }

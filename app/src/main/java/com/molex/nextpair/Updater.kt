@@ -36,7 +36,7 @@ object Updater {
         val repo = Repo(ctx)
         Thread {
             var err: Throwable? = null
-            if (forceFetch || repo.isStale()) err = runCatching {
+            if (repo.group.isNotBlank() && (forceFetch || repo.isStale())) err = runCatching {
                 val changes = repo.fetch()
                 if (changes.isNotEmpty() && Settings(ctx).notifyChanges) postChanges(ctx, changes)
             }.exceptionOrNull()

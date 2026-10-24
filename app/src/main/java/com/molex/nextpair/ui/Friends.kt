@@ -93,7 +93,7 @@ fun FriendsScreen(repo: Repo, mine: Schedule, mySubgroup: Int, now: LocalDateTim
         }
         item { ScreenTitle("когда вы оба свободны", "Друзья") }
         if (friends.isEmpty()) {
-            item { EmptyCard("Добавь друга", "Укажи имя и группу — покажу, где он сейчас и когда у вас общие окна.", Glyph.People) }
+            item { EmptyCard("Добавь первого друга", "Нажми сюда — укажи имя и группу, и я покажу, где он сейчас и когда у вас общие окна.", Glyph.People) { adding = true } }
         } else {
             item {
                 Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {

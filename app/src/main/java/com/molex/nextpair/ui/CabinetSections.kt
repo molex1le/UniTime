@@ -62,6 +62,7 @@ internal fun listIn(v: Any?, vararg prefer: String): List<JSONObject> = when (v)
 private fun hoursOf(o: JSONObject): Double = o.optString("hours").replace(',', '.').toDoubleOrNull() ?: 0.0
 
 private fun fmtNum(d: Double) = String.format(Locale.US, "%.1f", d).removeSuffix(".0")
+private fun fmt2(d: Double) = String.format(Locale.US, "%.2f", d)
 
 @Composable
 internal fun SectionTitle(text: String, right: String? = null) {
@@ -220,7 +221,18 @@ fun PerformanceView(v: Any?) {
     val root = v as? JSONObject
     val subjects = listIn(root?.opt("personalRating") ?: v, "subjects", "disciplines", "personalRating")
     if (subjects.isEmpty()) { JsonView(v ?: JSONObject(), 0); return }
+    // Общий средний — по средним предметов (как в журнале), без предметов без отметок.
+    val avgs = subjects.mapNotNull { s ->
+        s.str("average").replace(',', '.').toDoubleOrNull()
+            ?: mutableListOf<Pair<String, String>>().also { collectMarks(s, it) }
+                .mapNotNull { it.first.replace(',', '.').toDoubleOrNull() }.takeIf { it.isNotEmpty() }?.average()
+    }.filter { it > 0 }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+        BigNumber(
+            if (avgs.isEmpty()) "—" else fmt2(avgs.average()),
+            "средний балл",
+            if (avgs.isEmpty()) "отметок пока нет" else "по ${avgs.size} предметам из ${subjects.size}",
+        )
         subjects.sortedBy { it.str("name", "discipline", "abbrev") }.forEach { s ->
             val marks = mutableListOf<Pair<String, String>>().also { collectMarks(s, it) }
             val numeric = marks.mapNotNull { it.first.replace(',', '.').toDoubleOrNull() }

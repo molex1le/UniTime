@@ -77,7 +77,7 @@ fun DeadlinesScreen(
             }
         }
         if (open.isEmpty()) item {
-            EmptyCard("Дедлайнов нет", "Нажми «+», чтобы добавить лабу, реферат или зачёт. Напомню за сутки и за 2 часа.", Glyph.Flag)
+            EmptyCard("Добавь первый дедлайн", "Нажми сюда — лаба, реферат или зачёт. Напомню за сутки и за 2 часа.", Glyph.Flag, onClick = onAdd)
         }
         groups.forEach { (title, list) ->
             item(key = "h$title") {

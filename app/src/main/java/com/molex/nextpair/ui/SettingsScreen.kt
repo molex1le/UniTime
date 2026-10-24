@@ -54,6 +54,7 @@ fun SettingsScreen(
     onCalendar: (add: Boolean) -> Unit,
     onAccount: () -> Unit,
     onSecretStats: () -> Unit,
+    onIisAccount: () -> Unit,
 ) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     var secretTaps by remember { mutableIntStateOf(0) }
@@ -175,7 +176,7 @@ fun SettingsScreen(
         }
 
         item { Section("Новое в личном кабинете") }
-        item { IisNotifyCard(st) }
+        item { IisNotifyCard(st, onIisAccount) }
 
         item { Section("Виджет") }
         item { Card { Toggle("Тёмный виджет", null, st.widgetDark) { st.widgetDark = it; changed(notif = true) } } }
@@ -263,7 +264,7 @@ fun Toggle(title: String, sub: String?, on: Boolean, onChange: (Boolean) -> Unit
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-private fun IisNotifyCard(st: Settings) {
+private fun IisNotifyCard(st: Settings, onIisAccount: () -> Unit) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     val scope = androidx.compose.runtime.rememberCoroutineScope()
     val iis = remember { com.molex.nextpair.Iis(ctx) }
@@ -286,6 +287,16 @@ private fun IisNotifyCard(st: Settings) {
             Toggle("Пропуски", null, st.iisOmissions) { st.iisOmissions = it }
             Toggle("Сообщения из IIS", null, st.iisMessages) { st.iisMessages = it }
             Toggle("Поощрения и взыскания", null, st.iisPenalties) { st.iisPenalties = it }
+        }
+        Row(
+            Modifier.fillMaxWidth().heightIn(min = 48.dp).clip(RoundedCornerShape(10.dp)).clickable(onClick = onIisAccount),
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text("Пароль и контакты IIS", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = C.Ink)
+                Text("Последняя смена пароля, попытки входа, почта и телефон", fontSize = 12.sp, color = C.Muted)
+            }
+            Glyph(Glyph.Chevron, C.Chevron, 18.dp)
         }
         if (!hasPw) Text(
             "Пароль не сохранён: когда сайт завершит сессию, проверки остановятся до следующего входа. " +
