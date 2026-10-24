@@ -19,7 +19,7 @@ import java.time.format.DateTimeFormatter
 import java.time.format.TextStyle
 import java.util.Locale
 
-data class Display(val title: String, val text: String, val progress: Pair<Int, Int>? = null)
+data class Display(val title: String, val text: String)
 
 object Updater {
     private const val CHANNEL = "next_pair"
@@ -73,9 +73,7 @@ object Updater {
             val title = "Сейчас: ${name(cur)} · до ${cur.lesson.end.format(TIME)}"
             val text = if (next != null) "Далее: ${name(next)} ${whenText(next, now)}" + (if (room) " · ${place(next)}" else "")
             else "Больше пар нет"
-            val total = Duration.between(cur.startAt, cur.endAt).toMinutes().toInt()
-            val done = Duration.between(cur.startAt, now).toMinutes().toInt()
-            return Display(title, text, total to done)
+            return Display(title, text)
         }
         if (next == null) return Display("Пар не найдено", "В ближайшие три недели пусто")
         return Display("${name(next)} ${whenText(next, now)}", details(next, room, teacher))
@@ -154,7 +152,6 @@ object Updater {
             .setVisibility(Notification.VISIBILITY_PUBLIC)
             .setCategory(Notification.CATEGORY_EVENT)
             .setContentIntent(openApp(ctx))
-        d.progress?.let { (max, cur) -> b.setProgress(max, cur.coerceIn(0, max), false) }
         runCatching { nm.notify(NOTIF_ID, b.build()) }
     }
 
@@ -249,8 +246,9 @@ object Updater {
             v.setTextViewText(
                 R.id.w_until,
                 when {
-                    ongoing -> "идёт, ещё ${minutes(Duration.between(now, o.endAt).toMinutes() + 1)}"
-                    o.date == today -> "через ${minutes(Duration.between(now, o.startAt).toMinutes() + 1)}"
+                    // Точное время, а не «через N мин»: виджет обновляется только на границах пар.
+                    ongoing -> "идёт до ${o.lesson.end.format(TIME)}"
+                    o.date == today -> "сегодня"
                     else -> whenText(o, now)
                 },
             )

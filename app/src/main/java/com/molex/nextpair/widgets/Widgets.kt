@@ -80,7 +80,7 @@ object Widgets {
         v.setTextViewText(R.id.w_room, o.lesson.rooms.removeSuffix(" к.").ifBlank { "" })
         val whenTxt = when {
             ongoing -> "сейчас"
-            o.date == now.toLocalDate() -> "через ${minutes(Duration.between(now, o.startAt).toMinutes() + 1)}"
+            o.date == now.toLocalDate() -> "сегодня"
             o.date == now.toLocalDate().plusDays(1) -> "завтра"
             else -> o.date.dayOfWeek.getDisplayName(TextStyle.SHORT, RU)
         }

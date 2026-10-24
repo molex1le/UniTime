@@ -122,9 +122,8 @@ class Schedule(
     fun nextChange(now: LocalDateTime, subgroup: Int): LocalDateTime {
         val midnight = now.toLocalDate().plusDays(1).atStartOfDay()
         val (cur, next) = currentAndNext(now, subgroup)
-        // Во время пары обновляемся раз в 5 минут, чтобы двигалась полоска прогресса.
-        val tick = if (cur != null) now.plusMinutes(5) else null
-        val candidates = listOfNotNull(cur?.endAt, next?.startAt, midnight, tick).filter { it.isAfter(now) }
+        // Будим телефон только когда меняется текст: начало/конец пары и полночь.
+        val candidates = listOfNotNull(cur?.endAt, next?.startAt, midnight).filter { it.isAfter(now) }
         return candidates.min()
     }
 

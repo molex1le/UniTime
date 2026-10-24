@@ -164,6 +164,8 @@ object IisWatch {
 
 class IisWatchReceiver : BroadcastReceiver() {
     override fun onReceive(ctx: Context, intent: Intent) {
+        // Ночью (0:00–7:00) новых оценок не бывает — не будим сеть зря.
+        if (java.time.LocalTime.now().hour < 7) return
         val pending = goAsync()
         Thread {
             runCatching { IisWatch.check(ctx) }
