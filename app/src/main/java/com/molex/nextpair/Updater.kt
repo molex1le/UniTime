@@ -283,7 +283,7 @@ object Updater {
 class TickReceiver : BroadcastReceiver() {
     override fun onReceive(ctx: Context, intent: Intent) {
         // После перезагрузки и обновления приложения будильники стираются — ставим заново.
-        if (intent.action != null) runCatching { IisWatch.schedule(ctx) }
+        if (intent.action != null) runCatching { IisWatch.schedule(ctx); AppUpdate.schedule(ctx) }
         val pending = goAsync()
         Updater.refresh(ctx) { pending.finish() }
     }

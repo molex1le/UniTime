@@ -55,6 +55,8 @@ fun SettingsScreen(
     onAccount: () -> Unit,
     onSecretStats: () -> Unit,
     onIisAccount: () -> Unit,
+    onCheckUpdate: () -> Unit,
+    onUpdateToggle: () -> Unit,
 ) {
     val ctx = androidx.compose.ui.platform.LocalContext.current
     var secretTaps by remember { mutableIntStateOf(0) }
@@ -189,6 +191,17 @@ fun SettingsScreen(
                     Choice("Добавить", true) { onCalendar(true) }
                     Choice("Убрать оттуда", false) { onCalendar(false) }
                 }
+            }
+        }
+
+        item { Section("Обновления") }
+        item {
+            Card {
+                Text("Установлена UniTime ${com.molex.nextpair.AppUpdate.current(ctx)}", fontSize = 15.sp, fontWeight = FontWeight.Medium, color = C.Ink)
+                Toggle("Сообщать о новых версиях", "Проверка раз в день, обновление в одно нажатие", st.updateCheck) {
+                    st.updateCheck = it; onUpdateToggle()
+                }
+                Choice("Проверить сейчас", false, onCheckUpdate)
             }
         }
 

@@ -1,6 +1,10 @@
 name: Релиз
 
-# Ставишь тег v3.5 и пушишь его — GitHub собирает подписанный APK и создаёт релиз.
+# Ставишь тег и пушишь его — GitHub собирает подписанный APK и создаёт релиз
+# здесь и в публичном molex1le/UniTime (оттуда приложение узнаёт об обновлениях).
+# Текст тега = «что нового» для пользователей:
+#   git tag -a v3.8 -m "- Починил …" && git push origin v3.8
+# Строка [важно] в тексте делает обновление обязательным.
 on:
   push:
     tags: ['v*']
@@ -13,6 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
@@ -40,12 +46,27 @@ jobs:
           echo "$APK"
           test "$(basename "$APK")" = "UniTime-${GITHUB_REF_NAME#v}.apk" || { echo "Тег $GITHUB_REF_NAME не совпадает с versionName в app/build.gradle.kts"; exit 1; }
 
-      - name: Релиз на GitHub
+      - name: Что нового — из текста тега
+        run: |
+          git fetch --force --tags
+          git for-each-ref "refs/tags/$GITHUB_REF_NAME" --format='%(contents)' | sed '/^-----BEGIN/,$d' > "$RUNNER_TEMP/notes.md"
+          if ! grep -q '[^[:space:]]' "$RUNNER_TEMP/notes.md"; then echo "Исправления и улучшения." > "$RUNNER_TEMP/notes.md"; fi
+          cat "$RUNNER_TEMP/notes.md"
+
+      - name: Релиз в NextPair
         uses: softprops/action-gh-release@v2
         with:
           name: UniTime ${{ github.ref_name }}
           files: app/build/outputs/apk/release/UniTime-*.apk
-          generate_release_notes: true
+          body_path: ${{ runner.temp }}/notes.md
+
+      - name: Релиз в публичном UniTime (для обновлений в приложении)
+        env:
+          GH_TOKEN: ${{ secrets.UNITIME_RELEASE_TOKEN }}
+        run: |
+          if [ -z "$GH_TOKEN" ]; then echo "Нет секрета UNITIME_RELEASE_TOKEN — пропускаю"; exit 0; fi
+          gh release create "$GITHUB_REF_NAME" app/build/outputs/apk/release/UniTime-*.apk \
+            -R molex1le/UniTime --title "UniTime ${GITHUB_REF_NAME#v}" --notes-file "$RUNNER_TEMP/notes.md"
 
       - name: Удалить ключ с машины сборки
         if: always()

@@ -9,6 +9,7 @@ class Settings(ctx: Context) {
     // Чтение version подписывает Compose на изменения, запись — будит экран.
     private fun int(key: String, def: Int) = version.intValue.let { p.getInt(key, def) }
     private fun bool(key: String, def: Boolean) = version.intValue.let { p.getBoolean(key, def) }
+    private fun str(key: String) = version.intValue.let { p.getString(key, "")!! }
     private fun put(key: String, v: Any) {
         p.edit().apply {
             when (v) {
@@ -54,6 +55,13 @@ class Settings(ctx: Context) {
     var iisOmissions: Boolean get() = bool("iisOmissions", true); set(v) = put("iisOmissions", v)
     var iisMessages: Boolean get() = bool("iisMessages", true); set(v) = put("iisMessages", v)
     var iisPenalties: Boolean get() = bool("iisPenalties", true); set(v) = put("iisPenalties", v)
+
+    /** Обновления приложения. */
+    var updateCheck: Boolean get() = bool("updateCheck", true); set(v) = put("updateCheck", v)
+    /** О какой версии уже напомнили уведомлением. */
+    var updateNotified: String get() = str("updateNotified"); set(v) = put("updateNotified", v)
+    /** «Позже»: версия и до какого момента (мс) не показывать окно. */
+    var updateSnooze: String get() = str("updateSnooze"); set(v) = put("updateSnooze", v)
 
     var widgetDark: Boolean get() = bool("widgetDark", false); set(v) = put("widgetDark", v)
 

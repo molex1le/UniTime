@@ -80,6 +80,8 @@ class MainActivity : ComponentActivity() {
     private var loading by mutableStateOf(false)
     private var deadlines by mutableStateOf<List<Deadline>>(emptyList())
     private var pendingCalendarAdd: Boolean? = null
+    /** Новая версия, о которой показываем окно. */
+    private var update by mutableStateOf<AppUpdate.Release?>(null)
 
     private val calendarPermission = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { res ->
         val add = pendingCalendarAdd
@@ -103,6 +105,8 @@ class MainActivity : ComponentActivity() {
 
         load(force = false)
         IisWatch.schedule(this)
+        AppUpdate.schedule(this)
+        checkUpdate(force = intent?.getBooleanExtra("showUpdate", false) == true, manual = false)
         setContent {
             val scheme = if (C.Dark) darkColorScheme(primary = C.Accent, background = C.Ground, surface = C.Card)
             else lightColorScheme(primary = C.Accent, background = C.Ground, surface = C.Card)
@@ -119,6 +123,26 @@ class MainActivity : ComponentActivity() {
                 }
             }
         }
+    }
+
+    /** [force] — показать окно даже после «Позже» (нажали на уведомление). [manual] — из настроек, с ответом тостом. */
+    private fun checkUpdate(force: Boolean, manual: Boolean) {
+        if (!manual && !st.updateCheck) return
+        Thread {
+            val r = runCatching { AppUpdate.checkNewer(this) }
+            runOnUiThread {
+                val rel = r.getOrNull()
+                when {
+                    rel == null && manual -> toast(if (r.isFailure) "Не удалось проверить: нет связи" else "У тебя последняя версия ${AppUpdate.current(this)}")
+                    rel == null -> {}
+                    force || manual || rel.mandatory -> update = rel
+                    else -> {
+                        val (ver, until) = st.updateSnooze.split("|").let { it.getOrElse(0) { "" } to (it.getOrNull(1)?.toLongOrNull() ?: 0L) }
+                        if (ver != rel.version || System.currentTimeMillis() > until) update = rel
+                    }
+                }
+            }
+        }.start()
     }
 
     private fun askNotifications() {
@@ -238,6 +262,8 @@ class MainActivity : ComponentActivity() {
                     onCalendar = { calendar(it) },
                     onAccount = { stack.add(Overlay.Account) },
                     onIisAccount = { stack.add(Overlay.IisAccount) },
+                    onCheckUpdate = { checkUpdate(force = true, manual = true) },
+                    onUpdateToggle = { AppUpdate.schedule(this@MainActivity) },
                     onSecretStats = {
                         if (schedule != null) stack.add(Overlay.Stats) else toast("Сначала загрузите расписание")
                     },
@@ -279,6 +305,12 @@ class MainActivity : ComponentActivity() {
                     BottomNav(tab) { tab = it }
                 }
             }
+            }
+        }
+        update?.let { r ->
+            com.molex.nextpair.ui.UpdateDialog(r) {
+                st.updateSnooze = "${r.version}|${System.currentTimeMillis() + 24 * 3600_000L}"
+                update = null
             }
         }
         editing?.let { d ->
