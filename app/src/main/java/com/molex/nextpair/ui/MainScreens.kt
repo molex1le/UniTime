@@ -180,7 +180,7 @@ fun TodayScreen(
 ) {
     val today = now.toLocalDate()
     val monday = mondayOf(today)
-    var selected by remember { mutableStateOf(if (today.dayOfWeek == DayOfWeek.SUNDAY) monday else today) }
+    var selected by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(if (today.dayOfWeek == DayOfWeek.SUNDAY) monday else today) }
     val lessons = s.lessonsOn(selected, subgroup)
     val (cur, next) = s.currentAndNext(now, subgroup)
     val soon = deadlines.filter { !it.done && it.due.isBefore(now.plusDays(4)) }.take(3)

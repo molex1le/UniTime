@@ -36,6 +36,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveableStateHolder
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -191,17 +192,27 @@ class MainActivity : ComponentActivity() {
         LaunchedEffect(Unit) {
             while (true) { delay(30_000); now = LocalDateTime.now() }
         }
-        BackHandler(enabled = stack.isNotEmpty()) { stack.removeAt(stack.lastIndex) }
+        // Состояние каждого экрана (прокрутка, выбранный день, поиск) живёт, пока экран в стеке:
+        // открыл пару из ленты, вернулся — лента на том же месте.
+        val holder = rememberSaveableStateHolder()
+        fun keyOf(depth: Int, o: Overlay) = "$depth:$o"
+        val pop = {
+            holder.removeState(keyOf(stack.size, stack.last()))
+            stack.removeAt(stack.lastIndex)
+        }
+        BackHandler(enabled = stack.isNotEmpty()) { pop() }
         // Жест «назад» на вкладке: сначала вернуться на «Сегодня», и только оттуда — выйти.
         BackHandler(enabled = stack.isEmpty() && tab != Tab.Today) { tab = Tab.Today }
 
-        val back = { stack.removeAt(stack.lastIndex); Unit }
+        val back = { pop(); Unit }
         val openLesson = { o: Occurrence, own: Boolean -> stack.add(Overlay.LessonOf(o, own)); Unit }
         val openTarget = { t: Target -> repo.addRecent(t); stack.add(Overlay.Other(t)); Unit }
         val openSettings = { stack.add(Overlay.SettingsPage); Unit }
 
         Box(Modifier.fillMaxSize().background(C.Ground).statusBarsPadding()) {
-            when (val top = stack.lastOrNull()) {
+            val top = stack.lastOrNull()
+            holder.SaveableStateProvider(top?.let { keyOf(stack.size, it) } ?: "tab:${tab.name}") {
+            when (top) {
                 is Overlay.LessonOf -> LessonScreen(
                     top.o, top.own, repo, st, deadlines, now,
                     onBack = back,
@@ -267,6 +278,7 @@ class MainActivity : ComponentActivity() {
                     }
                     BottomNav(tab) { tab = it }
                 }
+            }
             }
         }
         editing?.let { d ->

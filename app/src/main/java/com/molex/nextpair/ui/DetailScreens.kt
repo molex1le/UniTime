@@ -285,8 +285,8 @@ private fun HideRow(title: String, sub: String, onClick: () -> Unit) {
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun SearchScreen(repo: Repo, onOpen: (Target) -> Unit, onFriends: () -> Unit) {
-    var query by remember { mutableStateOf("") }
-    var tab by remember { mutableIntStateOf(0) }
+    var query by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf("") }
+    var tab by androidx.compose.runtime.saveable.rememberSaveable { mutableIntStateOf(0) }
     var groups by remember { mutableStateOf<List<Target>?>(null) }
     var teachers by remember { mutableStateOf<List<Target>?>(null) }
     var error by remember { mutableStateOf<String?>(null) }

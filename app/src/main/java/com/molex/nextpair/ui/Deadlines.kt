@@ -58,7 +58,7 @@ fun DeadlinesScreen(
     onEdit: (Deadline) -> Unit,
     onToggle: (Deadline) -> Unit,
 ) {
-    var showDone by remember { mutableStateOf(false) }
+    var showDone by androidx.compose.runtime.saveable.rememberSaveable { mutableStateOf(false) }
     val open = deadlines.filterNot { it.done }
     val today = now.toLocalDate()
     val groups = listOf(
