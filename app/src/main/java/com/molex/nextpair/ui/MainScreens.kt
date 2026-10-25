@@ -436,7 +436,13 @@ fun ScheduleFeed(
         if (away) {
             Box(
                 Modifier.align(Alignment.BottomEnd).padding(20.dp).size(52.dp).clip(CircleShape).background(C.Accent)
-                    .clickable(onClickLabel = "К сегодня") { scope.launch { state.animateScrollToItem(0) } },
+                    .clickable(onClickLabel = "К сегодня") {
+                        // Издалека — сразу прыжок почти до начала и короткий плавный доезд, без долгой «тряски» по всей ленте.
+                        scope.launch {
+                            if (state.firstVisibleItemIndex > 4) state.scrollToItem(4)
+                            state.animateScrollToItem(0)
+                        }
+                    },
                 contentAlignment = Alignment.Center,
             ) { Glyph(Glyph.ArrowUp, C.OnAccent, 26.dp) }
         }

@@ -112,8 +112,8 @@ fun SettingsScreen(
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Settings.ACCENTS.forEachIndexed { i, name -> Choice(name, st.accent == i) { st.accent = i; changed(look = true) } }
                 }
-                Toggle("Короткие названия в списках", "«МатПрог», как в БГУИР; в карточке пары — полностью", st.shortNames) { st.shortNames = it; changed(look = true) }
-                Toggle("Номера пар", "«3 пара» рядом со временем", st.pairNumbers) { st.pairNumbers = it; changed(look = true) }
+                Toggle("Короткие названия в списках", "«МатПрог»", st.shortNames) { st.shortNames = it; changed(look = true) }
+                Toggle("Номера пар", "«3 пара»", st.pairNumbers) { st.pairNumbers = it; changed(look = true) }
                 Text("Открывать при запуске", fontSize = 13.sp, color = C.Muted)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Tab.entries.forEachIndexed { i, t -> Choice(t.label, st.startTab == i) { st.startTab = i; changed() } }

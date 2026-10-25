@@ -191,7 +191,7 @@ fun ScreenTitle(over: String?, title: String) {
 fun Segmented(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
     // Подложка выбранного пункта переезжает с пружинкой, а не перескакивает.
     BoxWithConstraints(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.Segment).padding(4.dp)) {
-        val gap = 6.dp
+        val gap = if (labels.size > 3) 4.dp else 6.dp
         val w = (maxWidth - gap * (labels.size - 1)) / labels.size
         val x by animateDpAsState((w + gap) * selected.coerceIn(0, labels.lastIndex), bouncy(), label = "seg")
         Box(Modifier.offset(x = x).width(w).height(40.dp).clip(RoundedCornerShape(10.dp)).background(C.SegOn))
@@ -203,7 +203,11 @@ fun Segmented(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
                     Modifier.weight(1f).height(40.dp).clip(RoundedCornerShape(10.dp)).clickable { onSelect(i) },
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = ink)
+                    // Много пунктов (темы) — шрифт мельче, и слово никогда не переносится.
+                    Text(
+                        label, fontSize = if (labels.size > 3) 13.sp else 14.sp, fontWeight = FontWeight.SemiBold, color = ink,
+                        maxLines = 1, softWrap = false, overflow = TextOverflow.Clip,
+                    )
                 }
             }
         }
