@@ -2,7 +2,19 @@ package com.molex.nextpair.ui
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.animateContentSize
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.foundation.clickable
+import kotlinx.coroutines.delay
+import androidx.compose.ui.graphics.graphicsLayer
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.key
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -71,19 +83,19 @@ fun DeadlinesScreen(
 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+            Row(Modifier.enter(0).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
                 ScreenTitle(if (open.isEmpty()) "всё сдано" else "осталось ${open.size}", "Дедлайны")
                 RoundButton(Glyph.Plus, "Новый дедлайн", onAdd)
             }
         }
         if (open.isEmpty()) item {
-            EmptyCard("Добавь первый дедлайн", "Нажми сюда — лаба, реферат или зачёт. Напомню за сутки и за 2 часа.", Glyph.Flag, onClick = onAdd)
+            Box(Modifier.enter(1)) { EmptyCard("Добавь первый дедлайн", "Нажми сюда — лаба, реферат или зачёт. Напомню за сутки и за 2 часа.", Glyph.Flag, onClick = onAdd) }
         }
-        groups.forEach { (title, list) ->
+        groups.forEachIndexed { g, (title, list) ->
             item(key = "h$title") {
-                Text(title.uppercase(), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = if (title == "Просрочено") C.Error else C.Muted, letterSpacing = 0.5.sp)
+                Text(modifier = Modifier.enter(1 + g * 2), text = title.uppercase(), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = if (title == "Просрочено") C.Error else C.Muted, letterSpacing = 0.5.sp)
             }
-            item(key = "l$title") { DeadlineList(list, now, onEdit, onToggle) }
+            item(key = "l$title") { Box(Modifier.animateItem().enter(2 + g * 2)) { DeadlineList(list, now, onEdit, onToggle) } }
         }
         if (done.isNotEmpty()) {
             item(key = "done") {
@@ -100,34 +112,55 @@ fun DeadlinesScreen(
 
 @Composable
 private fun DeadlineList(list: List<Deadline>, now: LocalDateTime, onEdit: (Deadline) -> Unit, onToggle: (Deadline) -> Unit) {
-    Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(C.Card)) {
+    Column(Modifier.fillMaxWidth().animateContentSize(bouncy()).clip(RoundedCornerShape(18.dp)).background(C.Card)) {
         list.forEachIndexed { i, d ->
+            key(d.id) {
             if (i > 0) Box(Modifier.fillMaxWidth().height(1.dp).background(C.Divider))
+            // Сначала галочка дорисовывается и задача зачёркивается, потом она уезжает в «Выполненные».
+            var flipping by remember { mutableStateOf(false) }
+            val done = d.done != flipping
+            LaunchedEffect(flipping) {
+                if (flipping) { delay(550); onToggle(d); flipping = false }
+            }
+            val fill by animateColorAsState(if (done) C.Accent else C.Card, label = "box")
+            val edge by animateColorAsState(if (done) C.Accent else C.Line, label = "boxEdge")
+            val ink by animateColorAsState(if (done) C.Muted else C.Ink, label = "title")
+            val pop = remember { Animatable(1f) }
+            LaunchedEffect(done) {
+                if (done && flipping) { pop.snapTo(0.7f); pop.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = 500f)) }
+            }
             Row(
                 Modifier.fillMaxWidth().clickable { onEdit(d) }.padding(horizontal = 14.dp, vertical = 10.dp),
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(12.dp),
             ) {
                 Box(
-                    Modifier.size(44.dp).clip(CircleShape).clickable(onClickLabel = if (d.done) "Вернуть" else "Готово") { onToggle(d) },
+                    Modifier.size(44.dp).clip(CircleShape).clickable(onClickLabel = if (d.done) "Вернуть" else "Готово") { if (!flipping) flipping = true },
                     contentAlignment = Alignment.Center,
                 ) {
                     Box(
-                        Modifier.size(24.dp).clip(CircleShape).background(if (d.done) C.Accent else C.Card)
-                            .border(2.dp, if (d.done) C.Accent else C.Line, CircleShape),
+                        Modifier.size(24.dp).graphicsLayer { scaleX = pop.value; scaleY = pop.value }.clip(CircleShape).background(fill)
+                            .border(2.dp, edge, CircleShape),
                         contentAlignment = Alignment.Center,
-                    ) { if (d.done) Glyph(Glyph.Check, C.OnAccent, 16.dp) }
+                    ) {
+                        androidx.compose.animation.AnimatedVisibility(
+                            done,
+                            enter = scaleIn(bouncy()) + fadeIn(),
+                            exit = scaleOut() + fadeOut(),
+                        ) { Glyph(Glyph.Check, C.OnAccent, 16.dp) }
+                    }
                 }
                 Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
                     Text(
-                        d.title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = if (d.done) C.Muted else C.Ink,
-                        textDecoration = if (d.done) TextDecoration.LineThrough else null, maxLines = 2, overflow = TextOverflow.Ellipsis,
+                        d.title, fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = ink,
+                        textDecoration = if (done) TextDecoration.LineThrough else null, maxLines = 2, overflow = TextOverflow.Ellipsis,
                     )
                     Text(
                         listOf(d.subject, deadlineLabel(d, now)).filter { it.isNotBlank() }.joinToString(" · "),
-                        fontSize = 13.sp, color = if (!d.done && d.due.isBefore(now)) C.Error else C.Muted,
+                        fontSize = 13.sp, color = if (!done && d.due.isBefore(now)) C.Error else C.Muted,
                     )
                 }
+            }
             }
         }
     }

@@ -19,6 +19,15 @@ import androidx.activity.compose.BackHandler
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -31,6 +40,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.SideEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateListOf
@@ -41,12 +52,15 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.toArgb
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.molex.nextpair.ui.BottomNav
 import com.molex.nextpair.ui.C
 import com.molex.nextpair.ui.DeadlineEditor
 import com.molex.nextpair.ui.DeadlinesScreen
 import com.molex.nextpair.ui.EmptyCard
+import com.molex.nextpair.ui.LocalEnterClock
+import com.molex.nextpair.ui.enterClockNow
 import com.molex.nextpair.ui.ExamsScreen
 import com.molex.nextpair.ui.FeedScreen
 import com.molex.nextpair.ui.FriendsScreen
@@ -233,9 +247,31 @@ class MainActivity : ComponentActivity() {
         val openTarget = { t: Target -> repo.addRecent(t); stack.add(Overlay.Other(t)); Unit }
         val openSettings = { stack.add(Overlay.SettingsPage); Unit }
 
+        // Вернулись назад — экран под ним уже знаком, карточки не выезжают заново.
+        val prevDepth = remember { intArrayOf(0) }
+        val popping = stack.size < prevDepth[0]
+        SideEffect { prevDepth[0] = stack.size }
+
         Box(Modifier.fillMaxSize().background(C.Ground).statusBarsPadding()) {
-            val top = stack.lastOrNull()
-            holder.SaveableStateProvider(top?.let { keyOf(stack.size, it) } ?: "tab:${tab.name}") {
+            AnimatedContent(
+                targetState = stack.size to stack.lastOrNull(),
+                contentKey = { (depth, o) -> o?.let { keyOf(depth, it) } ?: "tabs" },
+                transitionSpec = {
+                    val forward = targetState.first > initialState.first
+                    val spec = tween<IntOffset>(320, easing = FastOutSlowInEasing)
+                    if (forward) {
+                        (slideInHorizontally(spec) { it / 4 } + fadeIn(tween(220))) togetherWith
+                            (slideOutHorizontally(spec) { -it / 10 } + fadeOut(tween(160)))
+                    } else {
+                        (slideInHorizontally(spec) { -it / 10 } + fadeIn(tween(220))) togetherWith
+                            (slideOutHorizontally(spec) { it / 4 } + fadeOut(tween(160)))
+                    }
+                },
+                label = "screens",
+            ) { (depth, top) ->
+            val clock = remember { if (popping) 0L else enterClockNow() }
+            CompositionLocalProvider(LocalEnterClock provides clock) {
+            val screen = @Composable {
             when (top) {
                 is Overlay.LessonOf -> LessonScreen(
                     top.o, top.own, repo, st, deadlines, now,
@@ -278,12 +314,23 @@ class MainActivity : ComponentActivity() {
                     else LaunchedEffect(Unit) { back() }
                 }
                 null -> Column(Modifier.fillMaxSize()) {
-                    Box(Modifier.weight(1f).fillMaxWidth()) {
+                    AnimatedContent(
+                        targetState = tab,
+                        modifier = Modifier.weight(1f).fillMaxWidth(),
+                        transitionSpec = {
+                            (fadeIn(tween(220, delayMillis = 60)) + scaleIn(tween(280, delayMillis = 60), initialScale = 0.97f)) togetherWith fadeOut(tween(90))
+                        },
+                        label = "tabs",
+                    ) { shown ->
+                    val tabClock = remember { if (popping) 0L else enterClockNow() }
+                    CompositionLocalProvider(LocalEnterClock provides tabClock) {
+                    holder.SaveableStateProvider("tab:${shown.name}") {
+                    Box(Modifier.fillMaxSize()) {
                         val s = schedule
                         when {
-                            tab == Tab.Profile -> com.molex.nextpair.ui.AccountScreen(iis, onBack = null, onAppSettings = openSettings)
-                            tab == Tab.Search -> SearchScreen(repo, openTarget) { stack.add(Overlay.Friends) }
-                            tab == Tab.Deadlines -> DeadlinesScreen(
+                            shown == Tab.Profile -> com.molex.nextpair.ui.AccountScreen(iis, onBack = null, onAppSettings = openSettings)
+                            shown == Tab.Search -> SearchScreen(repo, openTarget) { stack.add(Overlay.Friends) }
+                            shown == Tab.Deadlines -> DeadlinesScreen(
                                 deadlines, now,
                                 onAdd = { editing = newDeadline() },
                                 onEdit = { editing = it },
@@ -293,17 +340,24 @@ class MainActivity : ComponentActivity() {
                             s == null -> Box(Modifier.padding(20.dp)) {
                                 EmptyCard("Расписание не загружено", "Проверь интернет и номер группы в настройках (шестерёнка на вкладке «Сегодня»).")
                             }
-                            tab == Tab.Today -> TodayScreen(
+                            shown == Tab.Today -> TodayScreen(
                                 s, repo.subgroup, repo.group, now, deadlines,
                                 onSettings = openSettings,
                                 onExams = { stack.add(Overlay.Exams) },
                                 onDeadlines = { tab = Tab.Deadlines },
                             ) { openLesson(it, true) }
-                            tab == Tab.Feed -> FeedScreen(s, repo.subgroup, now, deadlines, onSecret = { unlockNeon() }) { openLesson(it, true) }
+                            shown == Tab.Feed -> FeedScreen(s, repo.subgroup, now, deadlines, onSecret = { unlockNeon() }) { openLesson(it, true) }
                         }
+                    }
+                    }
+                    }
                     }
                     BottomNav(tab) { tab = it }
                 }
+            }
+            }
+            // Вкладки хранят своё состояние сами, внутри — у каждой свой ключ.
+            if (top != null) holder.SaveableStateProvider(keyOf(depth, top), screen) else screen()
             }
             }
         }

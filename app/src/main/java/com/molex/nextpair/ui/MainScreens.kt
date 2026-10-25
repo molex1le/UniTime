@@ -3,6 +3,7 @@ package com.molex.nextpair.ui
 import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -15,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
@@ -24,6 +26,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -124,8 +127,9 @@ fun BreakRow(minutes: Long) {
 
 @Composable
 fun EmptyCard(title: String, text: String, glyph: Glyph = Glyph.Calendar, onClick: (() -> Unit)? = null) {
-    var m = Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(C.Card)
-    if (onClick != null) m = m.clickable(onClick = onClick)
+    var m: Modifier = Modifier
+    if (onClick != null) m = m.bounceClick(onClick = onClick)
+    m = m.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(C.Card)
     Column(
         m.padding(horizontal = 20.dp, vertical = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -187,7 +191,7 @@ fun TodayScreen(
 
     LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
+            Row(Modifier.enter(0).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
                 ScreenTitle(dayTitle(today), "Сегодня")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     RoundButton(Glyph.Doc, "Сессия", onExams)
@@ -196,37 +200,40 @@ fun TodayScreen(
             }
         }
         item {
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            Row(Modifier.enter(1), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 Pill("${s.weekNumber(selected)} неделя", C.Soft, C.SoftInk)
                 Pill(if (subgroup == 0) group else "$group · п/г $subgroup", C.Card, C.Ink, border = true, onClick = onSettings)
             }
         }
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(Modifier.enter(2).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(6.dp)) {
                 for (i in 0..5) {
                     val d = monday.plusDays(i.toLong())
                     val on = d == selected
+                    val bg by animateColorAsState(if (on) C.Ink else C.Card, label = "day")
+                    val edge by animateColorAsState(if (on) C.Ink else C.Line, label = "dayEdge")
+                    val ink by animateColorAsState(if (on) C.Ground else C.Ink, label = "dayInk")
                     Column(
-                        Modifier.weight(1f).heightIn(min = 56.dp).clip(RoundedCornerShape(14.dp))
-                            .background(if (on) C.Ink else C.Card)
-                            .border(1.dp, if (on) C.Ink else C.Line, RoundedCornerShape(14.dp))
-                            .clickable { selected = d }.padding(vertical = 8.dp),
+                        Modifier.bounceClick { selected = d }.weight(1f).heightIn(min = 56.dp).clip(RoundedCornerShape(14.dp))
+                            .background(bg)
+                            .border(1.dp, edge, RoundedCornerShape(14.dp))
+                            .padding(vertical = 8.dp),
                         horizontalAlignment = Alignment.CenterHorizontally,
                         verticalArrangement = Arrangement.spacedBy(2.dp),
                     ) {
                         Text(dayName(d, false), fontSize = 12.sp, fontWeight = FontWeight.Medium, color = if (on) C.Ground.copy(alpha = 0.75f) else C.Muted)
-                        Text("${d.dayOfMonth}", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = if (on) C.Ground else C.Ink)
+                        Text("${d.dayOfMonth}", fontSize = 17.sp, fontWeight = FontWeight.Bold, color = ink)
                     }
                 }
             }
         }
         if (selected == today) {
             val hero = cur ?: next
-            if (hero != null) item { HeroCard(hero, isNow = cur != null, now = now, onClick = { onLesson(hero) }) }
+            if (hero != null) item { Box(Modifier.enter(3)) { HeroCard(hero, isNow = cur != null, now = now, onClick = { onLesson(hero) }) } }
         }
         if (soon.isNotEmpty()) item {
             Column(
-                Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(C.Card).clickable(onClick = onDeadlines).padding(14.dp),
+                Modifier.enter(4).bounceClick(onClick = onDeadlines).fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(C.Card).padding(14.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -242,24 +249,27 @@ fun TodayScreen(
             }
         }
         item {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
+            Row(Modifier.enter(4).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
                 Text(if (selected == today) "Пары на сегодня" else dayTitle(selected), fontSize = 17.sp, fontWeight = FontWeight.Bold, color = C.Ink)
                 if (lessons.isNotEmpty()) {
                     Text("${pairs(lessons.size)} · до ${lessons.maxOf { it.lesson.end }.format(TIME)}", fontSize = 13.sp, color = C.Muted)
                 }
             }
         }
-        if (lessons.isEmpty()) item { EmptyCard("Пар нет", "Можно выдохнуть. Дальше — на вкладке «Пары».") }
-        if (lessons.isNotEmpty()) item {
+        if (lessons.isEmpty()) item { Box(Modifier.enter(5)) { EmptyCard("Пар нет", "Можно выдохнуть. Дальше — на вкладке «Пары».") } }
+        // Смена дня: пары выезжают заново, по очереди.
+        if (lessons.isNotEmpty()) item(key = "day$selected") {
+            CompositionLocalProvider(LocalEnterClock provides remember(selected) { enterClockNow() }) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 lessons.forEachIndexed { i, o ->
                     Between(gapBefore(lessons, i))
                     val dl = deadlines.count { !it.done && it.subject == o.lesson.subject && !it.due.isBefore(now) }
-                    LessonRow(
+                    Box(Modifier.enter(5 + i)) { LessonRow(
                         o, faded = o.endAt.isBefore(now), highlighted = cur == o, showGroups = false,
                         extra = if (dl > 0) "Дедлайнов по предмету: $dl" else null,
-                    ) { onLesson(o) }
+                    ) { onLesson(o) } }
                 }
+            }
             }
         }
     }
@@ -270,12 +280,13 @@ private fun HeroCard(o: Occurrence, isNow: Boolean, now: LocalDateTime, onClick:
     val l = o.lesson
     val (_, _, typeName) = typeStyle(l.type)
     Column(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(C.Hero).clickable(onClick = onClick).padding(18.dp),
+        Modifier.bounceClick(onClick = onClick).fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(C.Hero).padding(18.dp),
         verticalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
             Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                Box(Modifier.size(8.dp).clip(CircleShape).background(if (isNow) C.Live else C.HeroBar))
+                if (isNow) Box(Modifier.size(8.dp)) { Box(Modifier.requiredSize(24.dp).align(Alignment.Center)) { LiveDot(C.Live) } }
+                else Box(Modifier.size(8.dp).clip(CircleShape).background(C.HeroBar))
                 Text(if (isNow) "Идёт сейчас" else "Следующая пара", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = C.HeroLabel)
             }
             Text(
@@ -398,7 +409,7 @@ fun ScheduleFeed(
                 if (title != null) item(key = "title") { Box(Modifier.padding(top = 8.dp)) { title() } }
                 if (extraCard != null) item(key = "extra") { extraCard() }
                 if (feed.none { it is FeedItem.Day }) item { EmptyCard("Пар не найдено", "Похоже, каникулы или расписание ещё не опубликовали.") }
-                feed.forEach { f ->
+                feed.forEachIndexed { n, f ->
                     when (f) {
                         is FeedItem.WeekHead -> stickyHeader(key = f.key) {
                             val end = f.monday.plusDays(5)
@@ -416,7 +427,7 @@ fun ScheduleFeed(
                             )
                         }
                         is FeedItem.Section -> item(key = f.key) { Text(f.title, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = C.Ink) }
-                        is FeedItem.Day -> item(key = f.key) { DayBlock(f.date, f.list, now, deadlines, showGroups, onLesson) }
+                        is FeedItem.Day -> item(key = f.key) { Box(Modifier.enter(n)) { DayBlock(f.date, f.list, now, deadlines, showGroups, onLesson) } }
                     }
                 }
             }

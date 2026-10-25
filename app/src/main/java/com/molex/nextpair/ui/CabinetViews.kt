@@ -123,7 +123,7 @@ fun MarkbookView(o: JSONObject) {
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Text(o.s("averageMark").ifBlank { "—" }, color = Color.White, fontSize = 48.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 48.sp)
+            CountUpText(o.s("averageMark").ifBlank { "—" }, Color.White, 48.sp, FontWeight.ExtraBold, 48.sp)
             Column(Modifier.padding(bottom = 6.dp)) {
                 Text("средний балл", color = C.HeroMuted, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
                 if (o.s("number").isNotBlank()) Text("зачётка № ${o.s("number")}", color = C.HeroMuted, fontSize = 12.sp)

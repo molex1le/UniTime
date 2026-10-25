@@ -139,7 +139,7 @@ private fun BigNumber(value: String, label: String, sub: String? = null) {
         Modifier.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(C.Hero).padding(20.dp),
         verticalAlignment = Alignment.Bottom, horizontalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text(value, color = Color.White, fontSize = 44.sp, fontWeight = FontWeight.ExtraBold, lineHeight = 44.sp)
+        CountUpText(value, Color.White, 44.sp, FontWeight.ExtraBold, 44.sp)
         Column(Modifier.padding(bottom = 5.dp)) {
             Text(label, color = C.HeroMuted, fontSize = 15.sp, fontWeight = FontWeight.SemiBold)
             if (sub != null) Text(sub, color = C.HeroMuted, fontSize = 12.sp)

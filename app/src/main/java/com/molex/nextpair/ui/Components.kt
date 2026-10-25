@@ -1,12 +1,19 @@
 package com.molex.nextpair.ui
 
 import android.graphics.BitmapFactory
+import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -15,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
@@ -33,6 +41,7 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -180,27 +189,34 @@ fun ScreenTitle(over: String?, title: String) {
 
 @Composable
 fun Segmented(labels: List<String>, selected: Int, onSelect: (Int) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.Segment).padding(4.dp),
-        horizontalArrangement = Arrangement.spacedBy(6.dp),
-    ) {
-        labels.forEachIndexed { i, label ->
-            val on = i == selected
-            Box(
-                Modifier.weight(1f).heightIn(min = 40.dp).clip(RoundedCornerShape(10.dp))
-                    .background(if (on) C.SegOn else Color.Transparent).clickable { onSelect(i) },
-                contentAlignment = Alignment.Center,
-            ) {
-                Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = if (on) C.Ink else C.Muted)
+    // Подложка выбранного пункта переезжает с пружинкой, а не перескакивает.
+    BoxWithConstraints(Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.Segment).padding(4.dp)) {
+        val gap = 6.dp
+        val w = (maxWidth - gap * (labels.size - 1)) / labels.size
+        val x by animateDpAsState((w + gap) * selected.coerceIn(0, labels.lastIndex), bouncy(), label = "seg")
+        Box(Modifier.offset(x = x).width(w).height(40.dp).clip(RoundedCornerShape(10.dp)).background(C.SegOn))
+        Row(horizontalArrangement = Arrangement.spacedBy(gap)) {
+            labels.forEachIndexed { i, label ->
+                val on = i == selected
+                val ink by animateColorAsState(if (on) C.Ink else C.Muted, label = "segInk")
+                Box(
+                    Modifier.weight(1f).height(40.dp).clip(RoundedCornerShape(10.dp)).clickable { onSelect(i) },
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text(label, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = ink)
+                }
             }
         }
     }
 }
 
+/** Полоска прогресса; при появлении плавно заполняется от нуля. */
 @Composable
 fun ProgressBar(fraction: Float, track: Color, bar: Color, height: Dp = 6.dp) {
+    val p = remember { Animatable(0f) }
+    LaunchedEffect(fraction) { p.animateTo(fraction.coerceIn(0f, 1f), tween(900, easing = FastOutSlowInEasing)) }
     Box(Modifier.fillMaxWidth().height(height).clip(RoundedCornerShape(height / 2)).background(track)) {
-        Box(Modifier.fillMaxWidth(fraction.coerceIn(0f, 1f)).height(height).background(bar))
+        Box(Modifier.fillMaxWidth(p.value).height(height).clip(RoundedCornerShape(height / 2)).background(bar))
     }
 }
 
@@ -210,9 +226,9 @@ fun LessonRow(o: Occurrence, faded: Boolean, highlighted: Boolean, showGroups: B
     val l = o.lesson
     val place = listOf(l.rooms, if (showGroups) l.groups else l.teacher).filter { it.isNotBlank() }.joinToString(" · ")
     Row(
-        Modifier.fillMaxWidth().alpha(if (faded) 0.5f else 1f).clip(RoundedCornerShape(18.dp)).background(C.Card)
+        Modifier.bounceClick(onClick = onClick).fillMaxWidth().alpha(if (faded) 0.5f else 1f).clip(RoundedCornerShape(18.dp)).background(C.Card)
             .border(1.dp, if (highlighted) C.Accent else C.Card, RoundedCornerShape(18.dp))
-            .clickable(onClick = onClick).padding(horizontal = 14.dp, vertical = 12.dp),
+            .padding(horizontal = 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
@@ -287,19 +303,32 @@ enum class Tab(val label: String) { Today("Сегодня"), Feed("Пары"), D
 
 @Composable
 fun BottomNav(current: Tab, onSelect: (Tab) -> Unit) {
-    Row(
-        Modifier.fillMaxWidth().background(C.Card).navigationBarsPadding().padding(horizontal = 4.dp, vertical = 8.dp),
-    ) {
-        Tab.entries.forEach { tab ->
-            val on = tab == current
-            Column(
-                Modifier.weight(1f).heightIn(min = 52.dp).clip(RoundedCornerShape(12.dp)).clickable { onSelect(tab) },
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.Center,
-            ) {
-                Icon(tab, if (on) C.Accent else C.Muted)
-                Spacer(Modifier.height(4.dp))
-                Text(tab.label, fontSize = 12.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium, color = if (on) C.Accent else C.Muted)
+    Box(Modifier.fillMaxWidth().background(C.Card).navigationBarsPadding().padding(horizontal = 4.dp, vertical = 8.dp)) {
+        BoxWithConstraints(Modifier.fillMaxWidth()) {
+            // Подсветка под иконкой перепрыгивает на выбранную вкладку.
+            val cell = maxWidth / Tab.entries.size
+            val pill = 56.dp
+            val x by animateDpAsState(cell * current.ordinal + (cell - pill) / 2, bouncy(), label = "nav")
+            Box(Modifier.offset(x = x, y = 4.dp).size(pill, 30.dp).clip(RoundedCornerShape(15.dp)).background(C.Soft))
+            Row(Modifier.fillMaxWidth()) {
+                Tab.entries.forEach { tab ->
+                    val on = tab == current
+                    val color by animateColorAsState(if (on) C.Accent else C.Muted, label = "navInk")
+                    val pop = remember { Animatable(1f) }
+                    LaunchedEffect(on) {
+                        if (on) { pop.snapTo(0.75f); pop.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = 500f)) }
+                    }
+                    Column(
+                        Modifier.weight(1f).heightIn(min = 56.dp).clip(RoundedCornerShape(12.dp)).clickable { onSelect(tab) }.padding(top = 4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally,
+                    ) {
+                        Box(Modifier.height(30.dp).graphicsLayer { scaleX = pop.value; scaleY = pop.value }, contentAlignment = Alignment.Center) {
+                            Icon(tab, color)
+                        }
+                        Spacer(Modifier.height(4.dp))
+                        Text(tab.label, fontSize = 12.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium, color = color)
+                    }
+                }
             }
         }
     }
