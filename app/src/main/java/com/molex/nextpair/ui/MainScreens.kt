@@ -18,6 +18,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.requiredSize
 import androidx.compose.foundation.layout.size
@@ -39,6 +40,11 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.lerp
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -129,16 +135,16 @@ fun BreakRow(minutes: Long) {
 }
 
 @Composable
-fun EmptyCard(title: String, text: String, glyph: Glyph = Glyph.Calendar, onClick: (() -> Unit)? = null) {
+fun EmptyCard(title: String, text: String, glyph: Glyph = Glyph.Calendar, glass: Boolean = false, onClick: (() -> Unit)? = null) {
     var m: Modifier = Modifier
     if (onClick != null) m = m.bounceClick(onClick = onClick)
-    m = m.fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(C.Card)
+    m = m.fillMaxWidth().then(if (glass) Modifier.glass(RoundedCornerShape(22.dp)) else Modifier.clip(RoundedCornerShape(22.dp)).background(C.Card))
     Column(
         m.padding(horizontal = 20.dp, vertical = 28.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Box(Modifier.size(56.dp).clip(RoundedCornerShape(18.dp)).background(C.Ground), contentAlignment = Alignment.Center) {
+        Box(Modifier.size(56.dp).clip(RoundedCornerShape(18.dp)).background(if (glass) glassFill() else C.Ground), contentAlignment = Alignment.Center) {
             Glyph(glyph, C.Muted, 28.dp)
         }
         Text(title, fontSize = 17.sp, fontWeight = FontWeight.Bold, color = C.Ink, textAlign = TextAlign.Center)
@@ -191,21 +197,29 @@ fun TodayScreen(
     val lessons = s.lessonsOn(selected, subgroup)
     val (cur, next) = s.currentAndNext(now, subgroup)
     val soon = deadlines.filter { !it.done && it.due.isBefore(now.plusDays(4)) }.take(3)
+    val glass = C.style == STYLE_GLASS
+    val colored = C.style == STYLE_COLOR
 
+    Box(Modifier.fillMaxSize()) {
     LazyColumn(Modifier.fillMaxWidth(), contentPadding = PaddingValues(20.dp), verticalArrangement = Arrangement.spacedBy(16.dp)) {
         item {
             Row(Modifier.enter(0).fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Top) {
                 ScreenTitle(dayTitle(today), "Сегодня")
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    RoundButton(Glyph.Doc, "Сессия", onExams)
-                    RoundButton(Glyph.Gear, "Настройки", onSettings)
+                    TopButton(Glyph.Doc, "Сессия", glass, onExams)
+                    TopButton(Glyph.Gear, "Настройки", glass, onSettings)
                 }
             }
         }
         item {
             Row(Modifier.enter(1), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Pill("${s.weekNumber(selected)} неделя", C.Soft, C.SoftInk)
-                Pill(if (subgroup == 0) group else "$group · п/г $subgroup", C.Card, C.Ink, border = true, onClick = onSettings)
+                if (glass) {
+                    Pill("${s.weekNumber(selected)} неделя", glassFill(strong = true), C.Ink)
+                    Pill(if (subgroup == 0) group else "$group · п/г $subgroup", glassFill(), C.Ink, onClick = onSettings)
+                } else {
+                    Pill("${s.weekNumber(selected)} неделя", C.Soft, C.SoftInk)
+                    Pill(if (subgroup == 0) group else "$group · п/г $subgroup", C.Card, C.Ink, border = true, onClick = onSettings)
+                }
             }
         }
         item {
@@ -213,8 +227,8 @@ fun TodayScreen(
                 for (i in 0..5) {
                     val d = monday.plusDays(i.toLong())
                     val on = d == selected
-                    val bg by animateColorAsState(if (on) C.Ink else C.Card, label = "day")
-                    val edge by animateColorAsState(if (on) C.Ink else C.Line, label = "dayEdge")
+                    val bg by animateColorAsState(if (on) C.Ink else if (glass) glassFill() else C.Card, label = "day")
+                    val edge by animateColorAsState(if (on) C.Ink else if (glass) glassFill(strong = true) else C.Line, label = "dayEdge")
                     val ink by animateColorAsState(if (on) C.Ground else C.Ink, label = "dayInk")
                     Column(
                         Modifier.bounceClick { selected = d }.weight(1f).heightIn(min = 56.dp).clip(RoundedCornerShape(14.dp))
@@ -235,18 +249,26 @@ fun TodayScreen(
             if (hero != null) item { Box(Modifier.enter(3)) { HeroCard(hero, isNow = cur != null, now = now, onClick = { onLesson(hero) }) } }
         }
         if (soon.isNotEmpty()) item {
+            // В «Цвете пар» карточка дедлайнов в обратных цветах, чтобы не потеряться среди цветных пар.
+            val shape = RoundedCornerShape(if (C.style == STYLE_CLASSIC) 18.dp else 22.dp)
+            val ink = if (colored) C.Ground else C.Ink
+            val muted = if (colored) C.Ground.copy(alpha = 0.65f) else C.Muted
+            val late = if (!colored) C.Error else if (C.Dark) Color(0xFFB0213F) else Color(0xFFFF8FA3)
+            val flag = if (!colored) C.Accent else typeTone("ПЗ")?.let { if (C.Dark) it.strong else it.fill } ?: C.Ground
             Column(
-                Modifier.enter(4).bounceClick(onClick = onDeadlines).fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(C.Card).padding(14.dp),
+                Modifier.enter(4).bounceClick(onClick = onDeadlines).fillMaxWidth()
+                    .then(if (glass) Modifier.glass(shape) else Modifier.clip(shape).background(if (colored) C.Ink else C.Card))
+                    .padding(if (C.style == STYLE_CLASSIC) 14.dp else 16.dp),
                 verticalArrangement = Arrangement.spacedBy(8.dp),
             ) {
                 Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    Glyph(Glyph.Flag, C.Accent, 18.dp)
-                    Text("Скоро дедлайны", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = C.Ink)
+                    Glyph(Glyph.Flag, flag, 18.dp)
+                    Text("Скоро дедлайны", fontSize = 14.sp, fontWeight = FontWeight.Bold, color = ink)
                 }
                 soon.forEach { d ->
                     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                        Text(d.title, fontSize = 14.sp, color = C.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
-                        Text(deadlineLabel(d, now), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = if (d.due.isBefore(now)) C.Error else C.Muted)
+                        Text(d.title, fontSize = 14.sp, color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f))
+                        Text(deadlineLabel(d, now), fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = if (d.due.isBefore(now)) late else muted)
                     }
                 }
             }
@@ -259,55 +281,109 @@ fun TodayScreen(
                 }
             }
         }
-        if (lessons.isEmpty()) item { Box(Modifier.enter(5)) { EmptyCard("Пар нет", "Можно выдохнуть. Дальше — на вкладке «Пары».") } }
+        if (lessons.isEmpty()) item { Box(Modifier.enter(5)) { EmptyCard("Пар нет", "Можно выдохнуть. Дальше — на вкладке «Пары».", glass = glass) } }
         // Смена дня: пары выезжают заново, по очереди.
         if (lessons.isNotEmpty()) item(key = "day$selected") {
             CompositionLocalProvider(LocalEnterClock provides remember(selected) { enterClockNow() }) {
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 lessons.forEachIndexed { i, o ->
-                    Between(gapBefore(lessons, i))
+                    // Перемена выезжает вместе со своей парой.
+                    Box(Modifier.enter(5 + i)) { Between(gapBefore(lessons, i)) }
                     val dl = deadlines.count { !it.done && it.subject == o.lesson.subject && !it.due.isBefore(now) }
                     Box(Modifier.enter(5 + i)) { LessonRow(
                         o, faded = o.endAt.isBefore(now), highlighted = cur == o, showGroups = false,
-                        extra = if (dl > 0) "Дедлайнов по предмету: $dl" else null,
+                        extra = if (dl > 0) "Дедлайнов по предмету: $dl" else null, styled = true,
                     ) { onLesson(o) } }
                 }
             }
             }
         }
     }
+    }
+}
+
+/** Круглая кнопка в шапке «Сегодня»; в «Стекле» — стеклянная. */
+@Composable
+private fun TopButton(glyph: Glyph, label: String, glass: Boolean, onClick: () -> Unit) {
+    if (!glass) return RoundButton(glyph, label, onClick)
+    Box(
+        Modifier.bounceClick(label = label, onClick = onClick).size(44.dp).glass(CircleShape),
+        contentAlignment = Alignment.Center,
+    ) { Glyph(glyph, C.Ink, 22.dp) }
 }
 
 @Composable
 private fun HeroCard(o: Occurrence, isNow: Boolean, now: LocalDateTime, onClick: () -> Unit) {
     val l = o.lesson
     val (_, _, typeName) = typeStyle(l.type)
-    Column(
-        Modifier.bounceClick(onClick = onClick).fillMaxWidth().clip(RoundedCornerShape(22.dp)).background(C.Hero).padding(18.dp),
-        verticalArrangement = Arrangement.spacedBy(14.dp),
-    ) {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                if (isNow) Box(Modifier.size(8.dp)) { Box(Modifier.requiredSize(24.dp).align(Alignment.Center)) { LiveDot(C.Live) } }
-                else Box(Modifier.size(8.dp).clip(CircleShape).background(C.HeroBar))
-                Text(if (isNow) "Идёт сейчас" else "Следующая пара", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = C.HeroLabel)
+    val glass = C.style == STYLE_GLASS
+    val tone = if (C.style == STYLE_COLOR) typeTone(l.type) else null
+    val shape = RoundedCornerShape(if (C.style == STYLE_CLASSIC) 22.dp else 28.dp)
+
+    // Цвета текста и полоски: на тёмной или цветной карточке — светлые, на стекле — как у темы.
+    val ink: Color
+    val muted: Color
+    val label: Color
+    val live: Color
+    val track: Color
+    val bar: Color
+    when {
+        tone != null -> { ink = Color.White; muted = Color.White.copy(alpha = 0.85f); label = Color.White; live = Color.White; track = Color.White.copy(alpha = 0.28f); bar = Color.White }
+        glass -> { ink = C.Ink; muted = C.Muted; label = C.Accent; live = glassLive; track = C.Ink.copy(alpha = 0.12f); bar = if (C.Dark) C.HeroBar else C.Accent }
+        else -> { ink = Color.White; muted = C.HeroMuted; label = C.HeroLabel; live = C.Live; track = C.HeroTrack; bar = C.HeroBar }
+    }
+    val surface = when {
+        tone != null -> Modifier.clip(shape).background(Brush.linearGradient(listOf(lerp(tone.strong, Color.White, 0.16f), tone.strong)))
+        glass -> {
+            // За стеклом светится пятно цвета занятия.
+            val glow = (typeTone(l.type)?.strong ?: C.Accent).copy(alpha = if (C.Dark) 0.55f else 0.35f)
+            Modifier.glass(shape, strong = true).drawBehind {
+                val c = Offset(size.width * 0.92f, 0f)
+                val r = size.width * 0.6f
+                drawCircle(Brush.radialGradient(listOf(glow, Color.Transparent), center = c, radius = r), radius = r, center = c)
             }
+        }
+        else -> Modifier.clip(shape).background(C.Hero)
+    }
+
+    Box(Modifier.bounceClick(onClick = onClick).fillMaxWidth().then(surface)) {
+        if (tone != null) Box(Modifier.matchParentSize()) {
+            // Крупная полупрозрачная метка типа в углу карточки.
             Text(
-                if (isNow) "ещё ${minutesText(Duration.between(now, o.endAt).toMinutes() + 1)}" else untilText(o, now),
-                fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = C.HeroMuted,
+                l.type, fontSize = 110.sp, lineHeight = 110.sp, fontWeight = FontWeight.Black, letterSpacing = (-6).sp,
+                color = Color.White.copy(alpha = 0.16f), maxLines = 1, softWrap = false,
+                modifier = Modifier.align(Alignment.BottomEnd).offset(x = 8.dp, y = 30.dp),
             )
         }
-        Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-            Text(l.subjectFull.ifBlank { l.subject }, fontSize = 22.sp, fontWeight = FontWeight.Bold, color = Color.White, lineHeight = 26.sp)
-            Text(listOf(typeName, l.rooms, l.teacher).filter { it.isNotBlank() }.joinToString(" · "), fontSize = 14.sp, color = C.HeroMuted)
-        }
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            val total = Duration.between(o.startAt, o.endAt).toMinutes().coerceAtLeast(1)
-            val done = if (isNow) Duration.between(o.startAt, now).toMinutes() else 0
-            ProgressBar(done.toFloat() / total, C.HeroTrack, C.HeroBar)
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Text(l.start.format(TIME), fontSize = 12.sp, color = C.HeroMuted)
-                Text(l.end.format(TIME), fontSize = 12.sp, color = C.HeroMuted)
+        Column(Modifier.fillMaxWidth().padding(if (C.style == STYLE_CLASSIC) 18.dp else 20.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
+            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    if (isNow) Box(Modifier.size(8.dp)) { Box(Modifier.requiredSize(24.dp).align(Alignment.Center)) { LiveDot(live) } }
+                    else Box(Modifier.size(8.dp).clip(CircleShape).background(bar))
+                    Text(if (isNow) "Идёт сейчас" else "Следующая пара", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = label)
+                }
+                Text(
+                    if (isNow) "ещё ${minutesText(Duration.between(now, o.endAt).toMinutes() + 1)}" else untilText(o, now),
+                    fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = muted,
+                )
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Text(
+                    l.subjectFull.ifBlank { l.subject }, color = ink, lineHeight = 26.sp,
+                    fontSize = if (C.style == STYLE_CLASSIC) 22.sp else 23.sp,
+                    fontWeight = if (tone != null) FontWeight.ExtraBold else FontWeight.Bold,
+                    modifier = if (tone != null) Modifier.padding(end = 40.dp) else Modifier,
+                )
+                Text(listOf(typeName, l.rooms, l.teacher).filter { it.isNotBlank() }.joinToString(" · "), fontSize = 14.sp, color = muted)
+            }
+            Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                val total = Duration.between(o.startAt, o.endAt).toMinutes().coerceAtLeast(1)
+                val done = if (isNow) Duration.between(o.startAt, now).toMinutes() else 0
+                ProgressBar(done.toFloat() / total, track, bar)
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Text(l.start.format(TIME), fontSize = 12.sp, color = muted)
+                    Text(l.end.format(TIME), fontSize = 12.sp, color = muted)
+                }
             }
         }
     }
@@ -419,7 +495,8 @@ fun ScheduleFeed(
                             Text(
                                 "${f.n} неделя · ${f.monday.dayOfMonth} ${month(f.monday)} – ${end.dayOfMonth} ${month(end)}",
                                 fontSize = 13.sp, fontWeight = FontWeight.Bold, color = C.SoftInk,
-                                modifier = Modifier.fillMaxWidth().background(C.Ground).padding(vertical = 8.dp)
+                                // В «Стекле» без сплошной полосы под плашкой: она резала цветной фон чёрной лентой.
+                                modifier = Modifier.fillMaxWidth().background(if (C.style == STYLE_GLASS) Color.Transparent else C.Ground).padding(vertical = 8.dp)
                                     .clip(RoundedCornerShape(10.dp)).background(C.Soft).padding(horizontal = 12.dp, vertical = 7.dp),
                             )
                         }
@@ -475,12 +552,17 @@ private fun DayBlock(date: LocalDate, list: List<Occurrence>, now: LocalDateTime
                 Text("${d.title} · до ${d.due.format(TIME)}", fontSize = 13.sp, fontWeight = FontWeight.SemiBold, color = C.SoftInk, maxLines = 1, overflow = TextOverflow.Ellipsis)
             }
         }
-        Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(C.Card)) {
+        // В «Цвете пар» каждая пара — своя цветная плашка, без общей карточки.
+        val colored = C.style == STYLE_COLOR
+        Column(
+            Modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(if (colored) Color.Transparent else C.Card),
+            verticalArrangement = Arrangement.spacedBy(if (colored) 4.dp else 0.dp),
+        ) {
             list.forEachIndexed { i, o ->
                 val gap = gapBefore(list, i)
                 when {
                     gap == null -> {}
-                    gap <= 0 -> Box(Modifier.fillMaxWidth().height(1.dp).background(C.Divider))
+                    gap <= 0 -> if (!colored) Box(Modifier.fillMaxWidth().height(1.dp).background(C.Divider))
                     else -> Box(Modifier.padding(vertical = 2.dp)) { Between(gap) }
                 }
                 CompactRow(o, showGroups, faded = o.endAt.isBefore(now)) { onLesson(o) }
@@ -492,27 +574,35 @@ private fun DayBlock(date: LocalDate, list: List<Occurrence>, now: LocalDateTime
 @Composable
 private fun CompactRow(o: Occurrence, showGroups: Boolean, faded: Boolean, onClick: () -> Unit) {
     val l = o.lesson
+    val tone = if (C.style == STYLE_COLOR) typeTone(l.type) else null
+    val ink = tone?.ink ?: C.Ink
+    val muted = tone?.ink?.copy(alpha = 0.7f) ?: C.Muted
     Row(
-        Modifier.fillMaxWidth().clickable(onClick = onClick).heightIn(min = 48.dp).padding(horizontal = 12.dp, vertical = 9.dp),
+        Modifier.fillMaxWidth()
+            .then(if (tone != null) Modifier.alpha(if (faded) 0.45f else 1f).clip(RoundedCornerShape(14.dp)).background(tone.fill) else Modifier)
+            .clickable(onClick = onClick).heightIn(min = 48.dp).padding(horizontal = 12.dp, vertical = 9.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         Column(Modifier.width(46.dp), verticalArrangement = Arrangement.Center) {
-            Text(l.start.format(TIME), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = if (faded) C.Muted else C.Ink)
-            Text(l.end.format(TIME), fontSize = 12.sp, color = C.Muted)
+            Text(l.start.format(TIME), fontSize = 14.sp, fontWeight = FontWeight.Bold, color = if (faded && tone == null) muted else ink)
+            Text(l.end.format(TIME), fontSize = 12.sp, color = muted)
         }
         Column(Modifier.weight(1f)) {
-            Text(l.title(), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = if (faded) C.Muted else C.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(l.title(), fontSize = 14.sp, fontWeight = FontWeight.Medium, color = if (faded && tone == null) muted else ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             val n = com.molex.nextpair.Settings.pairNumber(l.start)
             val sub = listOfNotNull(
                 if (C.pairNumbers && n != null) "$n пара" else null,
                 if (showGroups) l.groups.ifBlank { null } else null,
                 if (l.subgroup != 0) "п/г ${l.subgroup}" else null,
             ).joinToString(" · ")
-            if (sub.isNotBlank()) Text(sub, fontSize = 12.sp, color = C.Muted, maxLines = 1)
+            if (sub.isNotBlank()) Text(sub, fontSize = 12.sp, color = muted, maxLines = 1)
         }
-        Text(l.rooms.removeSuffix(" к.").ifBlank { "—" }, fontSize = 12.sp, color = C.Muted)
-        TypeChip(l.type)
+        Text(l.rooms.removeSuffix(" к.").ifBlank { "—" }, fontSize = 12.sp, color = muted)
+        if (tone != null) Text(
+            l.type, color = tone.fill, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+            modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(tone.ink).padding(horizontal = 8.dp, vertical = 4.dp),
+        ) else TypeChip(l.type)
     }
 }
 

@@ -27,8 +27,10 @@ class Settings(ctx: Context) {
     /** Секретная тема открыта комбинацией недель. */
     var neonUnlocked: Boolean get() = bool("neonUnlocked", false); set(v) = put("neonUnlocked", v)
 
-    /** 0 — как в системе, 1 — светлая, 2 — тёмная, 3 — чёрная (AMOLED), 4 — «Неон» (секретная). */
-    var theme: Int get() = int("theme", 0); set(v) = put("theme", v)
+    /** 0 — как в системе, 1 — светлая, 3 — чёрная (AMOLED), 4 — «Неон» (секретная). Бывшая тёмная (2) читается как чёрная. */
+    var theme: Int get() = int("theme", 0).let { if (it == 2) 3 else it }; set(v) = put("theme", v)
+    /** Стиль экрана «Сегодня» и нижней панели: 0 — обычный, 1 — стекло, 2 — цвет занятия. */
+    var style: Int get() = int("style", 0); set(v) = put("style", v)
     /** Индекс в [ACCENTS]. */
     var accent: Int get() = int("accent", 0); set(v) = put("accent", v)
     var shortNames: Boolean get() = bool("shortNames", true); set(v) = put("shortNames", v)

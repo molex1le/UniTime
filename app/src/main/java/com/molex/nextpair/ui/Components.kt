@@ -73,6 +73,7 @@ private val LIGHT = Palette(
     Color(0xFFE3E8FB), Color(0xFF2B44B8), Color(0xFF141A26), Color(0xFF2A3244),
     Color(0xFF9AA2AE), Color(0xFF9B1C35),
 )
+/** Основа для чёрной темы; отдельной тёмной темы больше нет. */
 private val DARK = Palette(
     true, Color(0xFF0F131B), Color(0xFF1A202B), Color(0xFFEDEFF3), Color(0xFFA3ABB8),
     Color(0xFF2A3140), Color(0xFF252C39), Color(0xFF1A202B), Color(0xFF323B4D),
@@ -88,6 +89,10 @@ private val NEON = Palette(
 )
 private val AMOLED = DARK.copy(ground = Color.Black, card = Color(0xFF12151C), segment = Color(0xFF12151C), hero = Color(0xFF1A2133))
 
+const val STYLE_CLASSIC = 0
+const val STYLE_GLASS = 1
+const val STYLE_COLOR = 2
+
 /** Акценты: (светлая тема, тёмная тема). */
 private val ACCENT = listOf(
     Color(0xFF2F4FD8) to Color(0xFF8EA2FF),
@@ -102,28 +107,34 @@ object C {
     var accentIndex by mutableStateOf(0)
     var shortNames by mutableStateOf(true)
     var pairNumbers by mutableStateOf(true)
+    /** Стиль экрана «Сегодня»: [STYLE_CLASSIC], [STYLE_GLASS] или [STYLE_COLOR]. */
+    var style by mutableStateOf(STYLE_CLASSIC)
 
-    fun apply(theme: Int, systemDark: Boolean, accent: Int, short: Boolean, numbers: Boolean) {
+    fun apply(theme: Int, systemDark: Boolean, accent: Int, short: Boolean, numbers: Boolean, style: Int) {
         palette = when (theme) {
             1 -> LIGHT
-            2 -> DARK
-            3 -> AMOLED
             4 -> NEON
-            else -> if (systemDark) DARK else LIGHT
+            // Тёмной темы больше нет: и «Авто» ночью, и старая тёмная — чёрная.
+            2, 3 -> AMOLED
+            else -> if (systemDark) AMOLED else LIGHT
         }
         accentIndex = accent.coerceIn(0, ACCENT.lastIndex)
         shortNames = short
         pairNumbers = numbers
+        this.style = style.coerceIn(STYLE_CLASSIC, STYLE_COLOR)
     }
 
     val Dark get() = palette.dark
     val Ground get() = palette.ground
-    val Card get() = palette.card
+    /** В «Стекле» все карточки приложения — полупрозрачные поверх цветного фона. */
+    val Card get() = if (style == STYLE_GLASS) glassFill() else palette.card
+    /** Непрозрачная карточка — для системных поверхностей (диалоги, меню). */
+    val SolidCard get() = palette.card
     val Ink get() = palette.ink
     val Muted get() = palette.muted
     val Line get() = palette.line
     val Divider get() = palette.divider
-    val Segment get() = palette.segment
+    val Segment get() = if (style == STYLE_GLASS) glassFill() else palette.segment
     val SegOn get() = palette.segOn
     val Soft get() = palette.soft
     val SoftInk get() = palette.softInk
@@ -224,31 +235,49 @@ fun ProgressBar(fraction: Float, track: Color, bar: Color, height: Dp = 6.dp) {
     }
 }
 
-/** Строка пары в списке: время, название, место, метка типа. */
+/**
+ * Строка пары в списке: время, название, место, метка типа.
+ * [styled] — строка рисуется в выбранном стиле (стекло или цвет пары).
+ */
 @Composable
-fun LessonRow(o: Occurrence, faded: Boolean, highlighted: Boolean, showGroups: Boolean, extra: String? = null, onClick: () -> Unit) {
+fun LessonRow(o: Occurrence, faded: Boolean, highlighted: Boolean, showGroups: Boolean, extra: String? = null, styled: Boolean = true, onClick: () -> Unit) {
     val l = o.lesson
     val place = listOf(l.rooms, if (showGroups) l.groups else l.teacher).filter { it.isNotBlank() }.joinToString(" · ")
+    val glass = styled && C.style == STYLE_GLASS
+    val tone = if (styled && C.style == STYLE_COLOR) typeTone(l.type) else null
+    val ink = tone?.ink ?: C.Ink
+    val muted = tone?.ink?.copy(alpha = 0.7f) ?: C.Muted
+    val shape = RoundedCornerShape(if (glass || tone != null) 22.dp else 18.dp)
+    val surface = when {
+        tone != null -> Modifier.clip(shape).background(tone.fill).border(2.dp, if (highlighted) tone.strong else tone.fill, shape)
+        glass -> Modifier.glass(shape).then(if (highlighted) Modifier.border(1.5.dp, C.Accent, shape) else Modifier)
+        else -> Modifier.clip(shape).background(C.Card).border(1.dp, if (highlighted) C.Accent else C.Card, shape)
+    }
     Row(
-        Modifier.bounceClick(onClick = onClick).fillMaxWidth().alpha(if (faded) 0.5f else 1f).clip(RoundedCornerShape(18.dp)).background(C.Card)
-            .border(1.dp, if (highlighted) C.Accent else C.Card, RoundedCornerShape(18.dp))
-            .padding(horizontal = 14.dp, vertical = 12.dp),
+        Modifier.bounceClick(onClick = onClick).fillMaxWidth().alpha(if (faded) (if (tone != null) 0.42f else 0.5f) else 1f).then(surface)
+            .padding(horizontal = if (tone != null) 16.dp else 14.dp, vertical = 12.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(14.dp),
     ) {
         Column(Modifier.width(46.dp)) {
             val n = com.molex.nextpair.Settings.pairNumber(l.start)
-            if (C.pairNumbers && n != null) Text("$n пара", fontSize = 11.sp, color = C.Muted)
-            Text(l.start.format(TIME), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = C.Ink)
-            Text(l.end.format(TIME), fontSize = 12.sp, color = C.Muted)
+            if (C.pairNumbers && n != null) Text("$n пара", fontSize = 11.sp, color = muted)
+            Text(l.start.format(TIME), fontSize = 15.sp, fontWeight = FontWeight.Bold, color = ink)
+            Text(l.end.format(TIME), fontSize = 12.sp, color = muted)
         }
         Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(3.dp)) {
-            Text(l.title(), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = C.Ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            Text(l.title(), fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = ink, maxLines = 1, overflow = TextOverflow.Ellipsis)
             val sub = if (l.subgroup != 0) "$place · п/г ${l.subgroup}" else place
-            if (sub.isNotBlank()) Text(sub, fontSize = 13.sp, color = C.Muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            if (extra != null) Text(extra, fontSize = 13.sp, color = C.Accent, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (sub.isNotBlank()) Text(sub, fontSize = 13.sp, color = muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (extra != null) Text(extra, fontSize = 13.sp, color = tone?.ink ?: C.Accent, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
-        TypeChip(l.type)
+        if (tone != null) {
+            // На цветной карточке метка «наизнанку»: тёмная плашка, буквы цвета карточки.
+            Text(
+                l.type, color = tone.fill, fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                modifier = Modifier.clip(RoundedCornerShape(8.dp)).background(tone.ink).padding(horizontal = 8.dp, vertical = 4.dp),
+            )
+        } else TypeChip(l.type)
     }
 }
 
@@ -307,17 +336,31 @@ enum class Tab(val label: String) { Today("Сегодня"), Feed("Пары"), D
 
 @Composable
 fun BottomNav(current: Tab, onSelect: (Tab) -> Unit) {
-    Box(Modifier.fillMaxWidth().background(C.Card).navigationBarsPadding().padding(horizontal = 4.dp, vertical = 8.dp)) {
-        BoxWithConstraints(Modifier.fillMaxWidth()) {
+    // В «Стекле» и «Цвете пар» панель — парящая плашка со скруглёнными краями, в обычном стиле — во всю ширину.
+    val floating = C.style != STYLE_CLASSIC
+    val shape = RoundedCornerShape(30.dp)
+    val outer = if (floating) Modifier.fillMaxWidth().navigationBarsPadding().padding(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 10.dp)
+    else Modifier.fillMaxWidth().background(C.Card).navigationBarsPadding()
+    val bar = when (C.style) {
+        STYLE_GLASS -> Modifier.glass(shape, strong = true).padding(horizontal = 4.dp, vertical = 6.dp)
+        STYLE_COLOR -> Modifier.clip(shape).background(C.Card).border(1.dp, C.Line, shape).padding(horizontal = 4.dp, vertical = 6.dp)
+        else -> Modifier.padding(horizontal = 4.dp, vertical = 8.dp)
+    }
+    // В «Цвете пар» подсветка тёмная, и иконка на ней светлая; подпись под ней остаётся обычного цвета.
+    val solid = C.style == STYLE_COLOR
+    Box(outer) {
+        BoxWithConstraints(Modifier.fillMaxWidth().then(bar)) {
             // Подсветка под иконкой перепрыгивает на выбранную вкладку.
             val cell = maxWidth / Tab.entries.size
             val pill = 56.dp
             val x by animateDpAsState(cell * current.ordinal + (cell - pill) / 2, bouncy(), label = "nav")
-            Box(Modifier.offset(x = x, y = 4.dp).size(pill, 30.dp).clip(RoundedCornerShape(15.dp)).background(C.Soft))
+            val glow = when (C.style) { STYLE_GLASS -> C.Accent.copy(alpha = 0.2f); STYLE_COLOR -> C.Ink; else -> C.Soft }
+            Box(Modifier.offset(x = x, y = 4.dp).size(pill, 30.dp).clip(RoundedCornerShape(15.dp)).background(glow))
             Row(Modifier.fillMaxWidth()) {
                 Tab.entries.forEach { tab ->
                     val on = tab == current
-                    val color by animateColorAsState(if (on) C.Accent else C.Muted, label = "navInk")
+                    val color by animateColorAsState(if (on) (if (solid) C.Ink else C.Accent) else C.Muted, label = "navInk")
+                    val iconColor by animateColorAsState(if (on && solid) C.Ground else color, label = "navIcon")
                     val pop = remember { Animatable(1f) }
                     LaunchedEffect(on) {
                         if (on) { pop.snapTo(0.75f); pop.animateTo(1f, spring(dampingRatio = 0.4f, stiffness = 500f)) }
@@ -327,7 +370,7 @@ fun BottomNav(current: Tab, onSelect: (Tab) -> Unit) {
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         Box(Modifier.height(30.dp).graphicsLayer { scaleX = pop.value; scaleY = pop.value }, contentAlignment = Alignment.Center) {
-                            Icon(tab, color)
+                            Icon(tab, iconColor)
                         }
                         Spacer(Modifier.height(4.dp))
                         Text(tab.label, fontSize = 12.sp, fontWeight = if (on) FontWeight.SemiBold else FontWeight.Medium, color = color)

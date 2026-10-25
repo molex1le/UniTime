@@ -55,6 +55,9 @@ import androidx.compose.ui.graphics.toArgb
 import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import com.molex.nextpair.ui.BottomNav
+import com.molex.nextpair.ui.GlassBackdrop
+import com.molex.nextpair.ui.STYLE_CLASSIC
+import com.molex.nextpair.ui.STYLE_GLASS
 import com.molex.nextpair.ui.C
 import com.molex.nextpair.ui.DeadlineEditor
 import com.molex.nextpair.ui.DeadlinesScreen
@@ -122,8 +125,8 @@ class MainActivity : ComponentActivity() {
         AppUpdate.schedule(this)
         checkUpdate(force = intent?.getBooleanExtra("showUpdate", false) == true, manual = false)
         setContent {
-            val scheme = if (C.Dark) darkColorScheme(primary = C.Accent, background = C.Ground, surface = C.Card)
-            else lightColorScheme(primary = C.Accent, background = C.Ground, surface = C.Card)
+            val scheme = if (C.Dark) darkColorScheme(primary = C.Accent, background = C.Ground, surface = C.SolidCard)
+            else lightColorScheme(primary = C.Accent, background = C.Ground, surface = C.SolidCard)
             MaterialTheme(colorScheme = scheme) {
                 if (st.onboarded) App()
                 else Box(Modifier.fillMaxSize().background(C.Ground).statusBarsPadding()) {
@@ -167,9 +170,11 @@ class MainActivity : ComponentActivity() {
 
     private fun applyLook() {
         val systemDark = (resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES
-        C.apply(st.theme, systemDark, st.accent, st.shortNames, st.pairNumbers)
+        C.apply(st.theme, systemDark, st.accent, st.shortNames, st.pairNumbers, st.style)
         val bar = { c: Int -> if (C.Dark) SystemBarStyle.dark(c) else SystemBarStyle.light(c, c) }
-        enableEdgeToEdge(statusBarStyle = bar(C.Ground.toArgb()), navigationBarStyle = bar(C.Card.toArgb()))
+        // Панель вкладок в стилях «Стекло» и «Цвет» парит над фоном — под ней цвет фона, а не карточки.
+        val navBar = if (C.style == STYLE_CLASSIC) C.Card else C.Ground
+        enableEdgeToEdge(statusBarStyle = bar(C.Ground.toArgb()), navigationBarStyle = bar(navBar.toArgb()))
     }
 
     private fun unlockNeon() {
@@ -253,6 +258,8 @@ class MainActivity : ComponentActivity() {
         SideEffect { prevDepth[0] = stack.size }
 
         Box(Modifier.fillMaxSize().background(C.Ground).statusBarsPadding()) {
+            // Цветной фон «Стекла» — общий для всех экранов, карточки на нём полупрозрачные.
+            if (C.style == STYLE_GLASS) GlassBackdrop()
             AnimatedContent(
                 targetState = stack.size to stack.lastOrNull(),
                 contentKey = { (depth, o) -> o?.let { keyOf(depth, it) } ?: "tabs" },

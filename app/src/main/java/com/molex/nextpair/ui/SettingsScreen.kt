@@ -106,8 +106,13 @@ fun SettingsScreen(
         item {
             Card {
                 Text("Тема", fontSize = 13.sp, color = C.Muted)
-                val themes = listOf("Авто", "Светлая", "Тёмная", "Чёрная") + if (st.neonUnlocked) listOf("Неон") else emptyList()
-                Segmented(themes, st.theme.coerceAtMost(themes.lastIndex)) { st.theme = it; changed(look = true) }
+                // В списке «Авто, Светлая, Чёрная, Неон», а в настройках хранятся старые номера: 0, 1, 3, 4.
+                val themes = listOf("Авто" to 0, "Светлая" to 1, "Чёрная" to 3) + if (st.neonUnlocked) listOf("Неон" to 4) else emptyList()
+                Segmented(themes.map { it.first }, themes.indexOfFirst { it.second == st.theme }.coerceAtLeast(0)) {
+                    st.theme = themes[it].second; changed(look = true)
+                }
+                Text("Стиль экрана «Сегодня»", fontSize = 13.sp, color = C.Muted)
+                Segmented(listOf("Обычный", "Стекло", "Цвет пар"), st.style) { st.style = it; changed(look = true) }
                 Text("Акцент", fontSize = 13.sp, color = C.Muted)
                 FlowRow(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
                     Settings.ACCENTS.forEachIndexed { i, name -> Choice(name, st.accent == i) { st.accent = i; changed(look = true) } }
@@ -229,11 +234,8 @@ fun SettingsScreen(
                     interactionSource = remember { androidx.compose.foundation.interaction.MutableInteractionSource() },
                     indication = null,
                 ) {
-                    secretTaps++
-                    when {
-                        secretTaps >= 7 -> { secretTaps = 0; onSecretStats() }
-                        secretTaps >= 3 -> android.widget.Toast.makeText(ctx, "Ещё ${7 - secretTaps}…", android.widget.Toast.LENGTH_SHORT).show()
-                    }
+                    // Без подсказок «ещё N»: тосты вставали в очередь и показывались с опозданием.
+                    if (++secretTaps >= 7) { secretTaps = 0; onSecretStats() }
                 }.padding(vertical = 4.dp),
             )
         }
