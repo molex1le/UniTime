@@ -4,6 +4,9 @@ import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.animation.animateColorAsState
+import androidx.compose.animation.core.FastOutSlowInEasing
+import androidx.compose.animation.core.tween
+import androidx.compose.foundation.gestures.animateScrollBy
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -437,10 +440,12 @@ fun ScheduleFeed(
             Box(
                 Modifier.align(Alignment.BottomEnd).padding(20.dp).size(52.dp).clip(CircleShape).background(C.Accent)
                     .clickable(onClickLabel = "К сегодня") {
-                        // Издалека — сразу прыжок почти до начала и короткий плавный доезд, без долгой «тряски» по всей ленте.
+                        // Прыжок на один экран от начала и плавный доезд на точно известное расстояние.
+                        // animateScrollToItem под конец «ползёт» рывками — он не знает высоту карточек заранее.
                         scope.launch {
-                            if (state.firstVisibleItemIndex > 4) state.scrollToItem(4)
-                            state.animateScrollToItem(0)
+                            val h = state.layoutInfo.viewportSize.height
+                            state.scrollToItem(0, h)
+                            state.animateScrollBy(-h * 1.2f, tween(450, easing = FastOutSlowInEasing))
                         }
                     },
                 contentAlignment = Alignment.Center,
