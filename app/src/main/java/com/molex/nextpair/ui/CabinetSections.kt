@@ -221,17 +221,16 @@ fun PerformanceView(v: Any?) {
     val root = v as? JSONObject
     val subjects = listIn(root?.opt("personalRating") ?: v, "subjects", "disciplines", "personalRating")
     if (subjects.isEmpty()) { JsonView(v ?: JSONObject(), 0); return }
-    // Общий средний — по средним предметов (как в журнале), без предметов без отметок.
-    val avgs = subjects.mapNotNull { s ->
-        s.str("average").replace(',', '.').toDoubleOrNull()
-            ?: mutableListOf<Pair<String, String>>().also { collectMarks(s, it) }
-                .mapNotNull { it.first.replace(',', '.').toDoubleOrNull() }.takeIf { it.isNotEmpty() }?.average()
+    // Общий средний — как в зачётке: сумма всех отметок по всем предметам, делённая на их количество.
+    val all = subjects.flatMap { s ->
+        mutableListOf<Pair<String, String>>().also { collectMarks(s, it) }.mapNotNull { it.first.replace(',', '.').toDoubleOrNull() }
     }.filter { it > 0 }
+    val withMarks = subjects.count { s -> mutableListOf<Pair<String, String>>().also { collectMarks(s, it) }.any { it.first.replace(',', '.').toDoubleOrNull() != null } }
     Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         BigNumber(
-            if (avgs.isEmpty()) "—" else fmt2(avgs.average()),
+            if (all.isEmpty()) "—" else fmt2(all.average()),
             "средний балл",
-            if (avgs.isEmpty()) "отметок пока нет" else "по ${avgs.size} предметам из ${subjects.size}",
+            if (all.isEmpty()) "отметок пока нет" else "${all.size} отметок по $withMarks предметам из ${subjects.size}",
         )
         subjects.sortedBy { it.str("name", "discipline", "abbrev") }.forEach { s ->
             val marks = mutableListOf<Pair<String, String>>().also { collectMarks(s, it) }

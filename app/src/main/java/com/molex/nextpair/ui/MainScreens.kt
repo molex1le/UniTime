@@ -375,6 +375,7 @@ private fun HeroCard(o: Occurrence, isNow: Boolean, now: LocalDateTime, onClick:
                     modifier = if (tone != null) Modifier.padding(end = 40.dp) else Modifier,
                 )
                 Text(listOf(typeName, l.rooms, l.teacher).filter { it.isNotBlank() }.joinToString(" · "), fontSize = 14.sp, color = muted)
+                if (l.note.isNotBlank()) Text(l.note, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = muted, maxLines = 3, overflow = TextOverflow.Ellipsis)
             }
             Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
                 val total = Duration.between(o.startAt, o.endAt).toMinutes().coerceAtLeast(1)
@@ -538,10 +539,15 @@ private fun DayBlock(date: LocalDate, list: List<Occurrence>, now: LocalDateTime
     Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
         Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.Bottom) {
             Text(
-                "${dayName(date)}, ${date.dayOfMonth} ${month(date)}" + if (isToday) " · сегодня" else "",
+                // Сегодняшний день выделен цветом, без приписки «сегодня» — с ней строка не влезала и переносилась.
+                "${dayName(date)}, ${date.dayOfMonth} ${month(date)}",
                 fontSize = 15.sp, fontWeight = FontWeight.Bold, color = if (isToday) C.Accent else C.Ink,
+                maxLines = 1, overflow = TextOverflow.Ellipsis, modifier = Modifier.weight(1f, fill = false),
             )
-            Text("${pairs(list.size)} · ${list.first().lesson.start.format(TIME)}–${list.maxOf { it.lesson.end }.format(TIME)}", fontSize = 12.sp, color = C.Muted)
+            Text(
+                "${pairs(list.size)} · ${list.first().lesson.start.format(TIME)}–${list.maxOf { it.lesson.end }.format(TIME)}",
+                fontSize = 12.sp, color = C.Muted, maxLines = 1, modifier = Modifier.padding(start = 8.dp),
+            )
         }
         due.forEach { d ->
             Row(
@@ -597,6 +603,7 @@ private fun CompactRow(o: Occurrence, showGroups: Boolean, faded: Boolean, onCli
                 if (l.subgroup != 0) "п/г ${l.subgroup}" else null,
             ).joinToString(" · ")
             if (sub.isNotBlank()) Text(sub, fontSize = 12.sp, color = muted, maxLines = 1)
+            if (l.note.isNotBlank()) Text(l.note, fontSize = 12.sp, color = tone?.ink ?: C.Accent, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         Text(l.rooms.removeSuffix(" к.").ifBlank { "—" }, fontSize = 12.sp, color = muted)
         if (tone != null) Text(

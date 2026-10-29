@@ -138,6 +138,13 @@ fun LessonScreen(
                 }
                 Text(l.subjectFull.ifBlank { l.subject }, fontSize = 30.sp, fontWeight = FontWeight.ExtraBold, color = C.Ink, lineHeight = 33.sp)
                 Text("${dayTitle(o.date)} · $whenText", fontSize = 15.sp, color = C.Muted)
+                if (l.note.isNotBlank()) Row(
+                    Modifier.fillMaxWidth().clip(RoundedCornerShape(14.dp)).background(C.Soft).padding(horizontal = 14.dp, vertical = 10.dp),
+                    verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp),
+                ) {
+                    Glyph(Glyph.Bell, C.SoftInk, 18.dp)
+                    Text(l.note, fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = C.SoftInk, lineHeight = 19.sp)
+                }
             }
         }
         item {

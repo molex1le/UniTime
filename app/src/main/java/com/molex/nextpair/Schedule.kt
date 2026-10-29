@@ -41,6 +41,8 @@ data class Lesson(
     val from: LocalDate?,
     val to: LocalDate?,
     val exactDate: LocalDate?,
+    /** Примечание из расписания БГУИР: перенос, «только 14.12», «будет лк по …». */
+    val note: String = "",
 ) {
     val teacher get() = teachers.joinToString(", ") { it.short }
 
@@ -197,6 +199,8 @@ class Schedule(
                 from = date(o.str("startLessonDate")),
                 to = date(o.str("endLessonDate")),
                 exactDate = date(o.str("dateLesson")),
+                // Если предмета нет, примечание уже стало названием — второй раз не показываем.
+                note = if (o.str("subject") != null) o.str("note")?.trim().orEmpty() else "",
             )
         }
     }

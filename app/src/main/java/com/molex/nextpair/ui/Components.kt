@@ -270,6 +270,7 @@ fun LessonRow(o: Occurrence, faded: Boolean, highlighted: Boolean, showGroups: B
             val sub = if (l.subgroup != 0) "$place · п/г ${l.subgroup}" else place
             if (sub.isNotBlank()) Text(sub, fontSize = 13.sp, color = muted, maxLines = 1, overflow = TextOverflow.Ellipsis)
             if (extra != null) Text(extra, fontSize = 13.sp, color = tone?.ink ?: C.Accent, fontWeight = FontWeight.SemiBold, maxLines = 1, overflow = TextOverflow.Ellipsis)
+            if (l.note.isNotBlank()) Text(l.note, fontSize = 13.sp, color = tone?.ink ?: C.Accent, fontWeight = FontWeight.SemiBold, maxLines = 2, overflow = TextOverflow.Ellipsis)
         }
         if (tone != null) {
             // На цветной карточке метка «наизнанку»: тёмная плашка, буквы цвета карточки.
