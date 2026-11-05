@@ -12,8 +12,8 @@ android {
         applicationId = "com.molex.nextpair"
         minSdk = 26
         targetSdk = 35
-        versionCode = 14
-        versionName = "3.11"
+        versionCode = 15
+        versionName = "3.12"
     }
 
     // Постоянный ключ: путь и пароль берутся из ~/.gradle/gradle.properties (или переменных окружения в CI).
