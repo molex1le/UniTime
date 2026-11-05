@@ -86,7 +86,7 @@ internal fun LoginScreen(iis: Iis, onBack: (() -> Unit)?, onLabs: (() -> Unit)? 
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         if (onBack != null) item { RoundButton(Glyph.Back, "Назад", onBack) }
         item { ScreenTitle("iis.bsuir.by", "Профиль") }
-        // Лабы считаются по расписанию — им вход в кабинет не нужен.
+        // «Предметы» считаются по расписанию — им вход в кабинет не нужен.
         if (onLabs != null) item { LabsRow(onLabs) }
         item {
             Column(
@@ -218,8 +218,8 @@ private fun LabsRow(onClick: () -> Unit) {
     ) {
         Glyph(Glyph.Flag, C.Accent, 22.dp)
         Column(Modifier.weight(1f)) {
-            Text("Лабораторные", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = C.Ink)
-            Text("Сколько осталось по каждому предмету", fontSize = 13.sp, color = C.Muted)
+            Text("Предметы", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = C.Ink)
+            Text("Сколько лекций, практик и лаб осталось", fontSize = 13.sp, color = C.Muted)
         }
         Glyph(Glyph.Chevron, C.Chevron, 18.dp)
     }

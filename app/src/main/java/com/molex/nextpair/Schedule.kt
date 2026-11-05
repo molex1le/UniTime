@@ -93,18 +93,29 @@ class Schedule(
         return Math.floorMod(anchorWeek - 1 + diff, 4) + 1
     }
 
+    /** Оставшиеся пары одного предмета, по типам: «ЛК», «ПЗ», «ЛР»… */
+    class SubjectLeft(val lesson: Lesson, val byType: Map<String, List<Occurrence>>) {
+        val total get() = byType.values.sumOf { it.size }
+        val first get() = byType.values.minOf { it.first().startAt }
+    }
+
     /**
-     * Оставшиеся лабораторные по предметам: пары «ЛР», которые ещё не закончились к [now],
-     * до конца семестра (или 150 дней, если конец неизвестен). Предметы — по ближайшей лабе.
+     * Пары, которые ещё не закончились к [now], до конца семестра (или 150 дней, если конец неизвестен),
+     * сгруппированные по предметам и типам. Предметы — по ближайшей паре, типы — ЛК, ПЗ, ЛР, потом остальные.
      */
-    fun remainingLabs(now: LocalDateTime, subgroup: Int): List<Pair<Lesson, List<Occurrence>>> {
+    fun remaining(now: LocalDateTime, subgroup: Int): List<SubjectLeft> {
         val end = termEnd?.takeIf { !it.isBefore(now.toLocalDate()) } ?: now.toLocalDate().plusDays(150)
+        val order = listOf("ЛК", "ПЗ", "ЛР")
         return generateSequence(now.toLocalDate()) { it.plusDays(1) }.takeWhile { !it.isAfter(end) }
             .flatMap { lessonsOn(it, subgroup) }
-            .filter { it.lesson.type == "ЛР" && it.endAt.isAfter(now) }
+            .filter { it.endAt.isAfter(now) && it.lesson.type.isNotBlank() }
             .groupBy { it.lesson.subject }
-            .map { (_, list) -> list.first().lesson to list }
-            .sortedBy { it.second.first().startAt }
+            .map { (_, list) ->
+                val byType = list.groupBy { it.lesson.type }.toList()
+                    .sortedBy { (t, _) -> order.indexOf(t).let { i -> if (i < 0) order.size else i } }.toMap()
+                SubjectLeft(list.first().lesson, byType)
+            }
+            .sortedBy { it.first }
     }
 
     fun lessonsOn(date: LocalDate, subgroup: Int): List<Occurrence> {

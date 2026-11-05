@@ -32,21 +32,24 @@ class FeaturesTest {
         assertTrue(s.lessonsOn(LocalDate.of(2026, 10, 28), 0).none { it.lesson.subject == "Философия" }) // и ПЗ в среду
     }
 
-    @Test fun remainingLabsOnlyFutureLabsGroupedBySubject() {
+    @Test fun remainingBySubjectAndType() {
         val s = fresh()
         val now = LocalDateTime.of(2026, 10, 26, 9, 0)
-        val labs = s.remainingLabs(now, 1)
-        assertTrue(labs.isNotEmpty())
-        labs.forEach { (l, list) ->
-            assertEquals("ЛР", l.type)
-            assertTrue(list.all { it.lesson.subject == l.subject && it.lesson.type == "ЛР" && it.endAt.isAfter(now) })
-            assertEquals(list.sortedBy { it.startAt }, list)
+        val left = s.remaining(now, 1)
+        assertTrue(left.isNotEmpty())
+        left.forEach { subj ->
+            subj.byType.forEach { (type, list) ->
+                assertTrue(list.all { it.lesson.subject == subj.lesson.subject && it.lesson.type == type && it.endAt.isAfter(now) })
+                assertEquals(list.sortedBy { it.startAt }, list)
+            }
+            // Типы по порядку ЛК → ПЗ → ЛР.
+            val known = subj.byType.keys.filter { it in listOf("ЛК", "ПЗ", "ЛР") }
+            assertEquals(known.sortedBy { listOf("ЛК", "ПЗ", "ЛР").indexOf(it) }, known)
         }
-        // Подгруппа 1 не видит лабы второй подгруппы.
-        assertTrue(labs.flatMap { it.second }.all { it.lesson.subgroup in setOf(0, 1) })
-        assertEquals("1 лаба", com.molex.nextpair.ui.labsCount(1))
-        assertEquals("3 лабы", com.molex.nextpair.ui.labsCount(3))
-        assertEquals("12 лаб", com.molex.nextpair.ui.labsCount(12))
+        assertEquals(left.sortedBy { it.first }.map { it.lesson.subject }, left.map { it.lesson.subject })
+        // Подгруппа 1 не видит пар второй подгруппы.
+        assertTrue(left.flatMap { it.byType.values.flatten() }.all { it.lesson.subgroup in setOf(0, 1) })
+        assertEquals("1 пара", com.molex.nextpair.ui.pairs(1))
     }
 
     @Test fun nextOfSubject() {
