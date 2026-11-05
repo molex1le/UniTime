@@ -93,6 +93,20 @@ class Schedule(
         return Math.floorMod(anchorWeek - 1 + diff, 4) + 1
     }
 
+    /**
+     * Оставшиеся лабораторные по предметам: пары «ЛР», которые ещё не закончились к [now],
+     * до конца семестра (или 150 дней, если конец неизвестен). Предметы — по ближайшей лабе.
+     */
+    fun remainingLabs(now: LocalDateTime, subgroup: Int): List<Pair<Lesson, List<Occurrence>>> {
+        val end = termEnd?.takeIf { !it.isBefore(now.toLocalDate()) } ?: now.toLocalDate().plusDays(150)
+        return generateSequence(now.toLocalDate()) { it.plusDays(1) }.takeWhile { !it.isAfter(end) }
+            .flatMap { lessonsOn(it, subgroup) }
+            .filter { it.lesson.type == "ЛР" && it.endAt.isAfter(now) }
+            .groupBy { it.lesson.subject }
+            .map { (_, list) -> list.first().lesson to list }
+            .sortedBy { it.second.first().startAt }
+    }
+
     fun lessonsOn(date: LocalDate, subgroup: Int): List<Occurrence> {
         val week = weekNumber(date)
         return lessons.filter { l ->

@@ -87,6 +87,7 @@ sealed interface Overlay {
     data object Exams : Overlay
     data object Stats : Overlay
     data object IisAccount : Overlay
+    data object Labs : Overlay
 }
 
 class MainActivity : ComponentActivity() {
@@ -251,6 +252,7 @@ class MainActivity : ComponentActivity() {
         val openLesson = { o: Occurrence, own: Boolean -> stack.add(Overlay.LessonOf(o, own)); Unit }
         val openTarget = { t: Target -> repo.addRecent(t); stack.add(Overlay.Other(t)); Unit }
         val openSettings = { stack.add(Overlay.SettingsPage); Unit }
+        val openLabs = { if (schedule != null) stack.add(Overlay.Labs) else toast("Сначала загрузите расписание"); Unit }
 
         // Вернулись назад — экран под ним уже знаком, карточки не выезжают заново.
         val prevDepth = remember { intArrayOf(0) }
@@ -312,7 +314,8 @@ class MainActivity : ComponentActivity() {
                     },
                 )
                 Overlay.Stats -> schedule?.let { s -> com.molex.nextpair.ui.SecretStatsScreen(s, repo.subgroup, now, onBack = back) } ?: LaunchedEffect(Unit) { back() }
-                Overlay.Account -> com.molex.nextpair.ui.AccountScreen(iis, onBack = back, onAppSettings = openSettings)
+                Overlay.Account -> com.molex.nextpair.ui.AccountScreen(iis, onBack = back, onAppSettings = openSettings, onLabs = openLabs)
+                Overlay.Labs -> schedule?.let { s -> com.molex.nextpair.ui.LabsScreen(s, repo.subgroup, now, onBack = back) { openLesson(it, true) } } ?: LaunchedEffect(Unit) { back() }
                 Overlay.IisAccount -> com.molex.nextpair.ui.IisSectionScreen(iis, Iis.Kind.Settings, onBack = back)
                 Overlay.Exams -> schedule?.let { s -> ExamsScreen(s, now, onBack = back) { openLesson(it, true) } } ?: LaunchedEffect(Unit) { back() }
                 Overlay.Friends -> {
@@ -335,7 +338,7 @@ class MainActivity : ComponentActivity() {
                     Box(Modifier.fillMaxSize()) {
                         val s = schedule
                         when {
-                            shown == Tab.Profile -> com.molex.nextpair.ui.AccountScreen(iis, onBack = null, onAppSettings = openSettings)
+                            shown == Tab.Profile -> com.molex.nextpair.ui.AccountScreen(iis, onBack = null, onAppSettings = openSettings, onLabs = openLabs)
                             shown == Tab.Search -> SearchScreen(repo, openTarget) { stack.add(Overlay.Friends) }
                             shown == Tab.Deadlines -> DeadlinesScreen(
                                 deadlines, now,

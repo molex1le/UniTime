@@ -32,6 +32,23 @@ class FeaturesTest {
         assertTrue(s.lessonsOn(LocalDate.of(2026, 10, 28), 0).none { it.lesson.subject == "Философия" }) // и ПЗ в среду
     }
 
+    @Test fun remainingLabsOnlyFutureLabsGroupedBySubject() {
+        val s = fresh()
+        val now = LocalDateTime.of(2026, 10, 26, 9, 0)
+        val labs = s.remainingLabs(now, 1)
+        assertTrue(labs.isNotEmpty())
+        labs.forEach { (l, list) ->
+            assertEquals("ЛР", l.type)
+            assertTrue(list.all { it.lesson.subject == l.subject && it.lesson.type == "ЛР" && it.endAt.isAfter(now) })
+            assertEquals(list.sortedBy { it.startAt }, list)
+        }
+        // Подгруппа 1 не видит лабы второй подгруппы.
+        assertTrue(labs.flatMap { it.second }.all { it.lesson.subgroup in setOf(0, 1) })
+        assertEquals("1 лаба", com.molex.nextpair.ui.labsCount(1))
+        assertEquals("3 лабы", com.molex.nextpair.ui.labsCount(3))
+        assertEquals("12 лаб", com.molex.nextpair.ui.labsCount(12))
+    }
+
     @Test fun nextOfSubject() {
         val s = fresh()
         val o = s.nextOf("КС", LocalDateTime.of(2026, 10, 26, 9, 0), 1)

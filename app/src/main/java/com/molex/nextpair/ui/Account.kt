@@ -54,16 +54,16 @@ import org.json.JSONObject
 import org.json.JSONTokener
 
 @Composable
-fun AccountScreen(iis: Iis, onBack: (() -> Unit)?, onAppSettings: () -> Unit) {
+fun AccountScreen(iis: Iis, onBack: (() -> Unit)?, onAppSettings: () -> Unit, onLabs: (() -> Unit)? = null) {
     val ctx = LocalContext.current
     var loggedIn by remember { mutableStateOf(iis.loggedIn) }
     var open by remember { mutableStateOf<Iis.Section?>(null) }
     androidx.activity.compose.BackHandler(enabled = open != null) { open = null }
     val section = open
     when {
-        !loggedIn -> LoginScreen(iis, onBack) { loggedIn = true }
+        !loggedIn -> LoginScreen(iis, onBack, onLabs) { loggedIn = true }
         section != null -> SectionScreen(iis, section, onBack = { open = null }) { loggedIn = false; open = null }
-        else -> CabinetHome(iis, onBack, onOpen = { if (it.kind == Iis.Kind.Settings) onAppSettings() else open = it }) {
+        else -> CabinetHome(iis, onBack, onLabs, onOpen = { if (it.kind == Iis.Kind.Settings) onAppSettings() else open = it }) {
             Thread { iis.logout(); IisWatch.reset(ctx); IisWatch.schedule(ctx) }.start()
             loggedIn = false
         }
@@ -71,7 +71,7 @@ fun AccountScreen(iis: Iis, onBack: (() -> Unit)?, onAppSettings: () -> Unit) {
 }
 
 @Composable
-internal fun LoginScreen(iis: Iis, onBack: (() -> Unit)?, onDone: () -> Unit) {
+internal fun LoginScreen(iis: Iis, onBack: (() -> Unit)?, onLabs: (() -> Unit)? = null, onDone: () -> Unit) {
     val ctx = LocalContext.current
     val scope = rememberCoroutineScope()
     var login by remember { mutableStateOf(iis.login) }
@@ -86,6 +86,8 @@ internal fun LoginScreen(iis: Iis, onBack: (() -> Unit)?, onDone: () -> Unit) {
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         if (onBack != null) item { RoundButton(Glyph.Back, "Назад", onBack) }
         item { ScreenTitle("iis.bsuir.by", "Профиль") }
+        // Лабы считаются по расписанию — им вход в кабинет не нужен.
+        if (onLabs != null) item { LabsRow(onLabs) }
         item {
             Column(
                 Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(C.Card).padding(16.dp),
@@ -174,7 +176,7 @@ private fun PasswordField(value: String, onChange: (String) -> Unit) {
 }
 
 @Composable
-private fun CabinetHome(iis: Iis, onBack: (() -> Unit)?, onOpen: (Iis.Section) -> Unit, onLogout: () -> Unit) {
+private fun CabinetHome(iis: Iis, onBack: (() -> Unit)?, onLabs: (() -> Unit)?, onOpen: (Iis.Section) -> Unit, onLogout: () -> Unit) {
     // Пока смотришь меню, в фоне подтягиваем самые нужные разделы — к нажатию они уже готовы.
     LaunchedEffect(Unit) {
         withContext(Dispatchers.IO) {
@@ -185,6 +187,7 @@ private fun CabinetHome(iis: Iis, onBack: (() -> Unit)?, onOpen: (Iis.Section) -
     LazyColumn(Modifier.fillMaxSize(), contentPadding = PaddingValues(start = 20.dp, end = 20.dp, top = 12.dp, bottom = 32.dp), verticalArrangement = Arrangement.spacedBy(14.dp)) {
         if (onBack != null) item { RoundButton(Glyph.Back, "Назад", onBack) }
         item { ScreenTitle("личный кабинет IIS · ${iis.login}", "Профиль") }
+        if (onLabs != null) item { LabsRow(onLabs) }
         item {
             Column(Modifier.fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(C.Card)) {
                 Iis.SECTIONS.forEachIndexed { i, s ->
@@ -202,6 +205,23 @@ private fun CabinetHome(iis: Iis, onBack: (() -> Unit)?, onOpen: (Iis.Section) -
             }
         }
         item { Choice("Выйти из аккаунта", false, onLogout) }
+    }
+}
+
+@Composable
+private fun LabsRow(onClick: () -> Unit) {
+    Row(
+        Modifier.bounceClick(onClick = onClick).fillMaxWidth().clip(RoundedCornerShape(18.dp)).background(C.Card)
+            .heightIn(min = 56.dp).padding(horizontal = 16.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(14.dp),
+    ) {
+        Glyph(Glyph.Flag, C.Accent, 22.dp)
+        Column(Modifier.weight(1f)) {
+            Text("Лабораторные", fontSize = 15.sp, fontWeight = FontWeight.SemiBold, color = C.Ink)
+            Text("Сколько осталось по каждому предмету", fontSize = 13.sp, color = C.Muted)
+        }
+        Glyph(Glyph.Chevron, C.Chevron, 18.dp)
     }
 }
 
